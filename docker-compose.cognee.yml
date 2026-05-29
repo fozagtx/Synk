@@ -1,0 +1,31 @@
+services:
+  cognee:
+    image: cognee/cognee:main
+    container_name: synk-cognee
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_PROVIDER: custom
+      LLM_MODEL: openai/${AIMLAPI_MODEL:-gpt-4o}
+      LLM_ENDPOINT: ${AIMLAPI_BASE_URL:-https://api.aimlapi.com/v1}
+      LLM_API_KEY: ${AIMLAPI_API_KEY}
+      LLM_INSTRUCTOR_MODE: json_mode
+      EMBEDDING_PROVIDER: openai_compatible
+      EMBEDDING_MODEL: ${AIMLAPI_EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_ENDPOINT: ${AIMLAPI_BASE_URL:-https://api.aimlapi.com/v1}
+      EMBEDDING_API_KEY: ${AIMLAPI_API_KEY}
+      EMBEDDING_DIMENSIONS: "1536"
+      DB_PROVIDER: sqlite
+      GRAPH_DATABASE_PROVIDER: kuzu
+      VECTOR_DB_PROVIDER: lancedb
+      REQUIRE_AUTHENTICATION: "false"
+      ENABLE_BACKEND_ACCESS_CONTROL: "false"
+      CORS_ALLOWED_ORIGINS: http://localhost:3100
+      COGNEE_SKIP_CONNECTION_TEST: "true"
+    volumes:
+      - cognee_data:/app/cognee/.data_storage
+      - cognee_system:/app/cognee/.cognee_system
+
+volumes:
+  cognee_data:
+  cognee_system:

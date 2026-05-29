@@ -1,0 +1,749 @@
+import * as errore from "errore";
+
+import { env } from "@/lib/env";
+import { RemoteFetchError, RemoteResponseError } from "@/lib/scan/errors";
+import type {
+  DetectedDependency,
+  DetectedStack,
+  Evidence,
+  FindingType,
+} from "@/lib/types/scan";
+
+export interface RiskQuery {
+  id: string;
+  type: FindingType;
+  dependency: DetectedDependency;
+  query: string;
+  evidence: Evidence[];
+}
+
+interface BrightDataRequestPayload {
+  zone: string;
+  url: string;
+  format: "raw";
+}
+
+interface BrightDataEvidenceResult {
+  queryId: string;
+  evidence: Evidence[];
+}
+
+const BRIGHT_DATA_REQUEST_URL = "https://api.brightdata.com/request";
+const BRIGHT_DATA_QUERY_LIMIT = 4;
+const BRIGHT_DATA_RESULT_LIMIT = 2;
+const BRIGHT_DATA_ATTEMPTS = 3;
+
+const VENDOR_EVIDENCE_URLS: Record<string, string> = {
+  "Next.js": "https://github.com/vercel/next.js/security/advisories",
+  React: "https://react.dev/blog",
+  Vue: "https://blog.vuejs.org/",
+  Nuxt: "https://nuxt.com/blog",
+  Svelte: "https://svelte.dev/blog",
+  SvelteKit: "https://svelte.dev/blog",
+  Express: "https://expressjs.com/en/advanced/security-updates.html",
+  Fastify: "https://github.com/fastify/fastify/security/advisories",
+  Django: "https://www.djangoproject.com/weblog/",
+  Flask: "https://flask.palletsprojects.com/en/stable/changes/",
+  Rails: "https://rubyonrails.org/category/releases",
+  Laravel: "https://laravel-news.com/category/releases",
+  Spring: "https://spring.io/security",
+  "Spring Boot": "https://spring.io/security",
+  Terraform: "https://developer.hashicorp.com/terraform/language/upgrade-guides",
+};
+
+export async function enrichRiskQueriesWithBrightData({
+  queries,
+  scannedAt,
+}: {
+  queries: RiskQuery[];
+  scannedAt: string;
+}): Promise<RemoteFetchError | RemoteResponseError | RiskQuery[]> {
+  const serpApiKey: string | null = env.brightDataSerpApiKey;
+  const webUnlockerApiKey: string | null = env.brightDataWebUnlockerApiKey;
+
+  if (!serpApiKey || !webUnlockerApiKey) {
+    return queries;
+  }
+
+  const liveQueries: RiskQuery[] = queries.slice(0, BRIGHT_DATA_QUERY_LIMIT);
+  const evidenceResults = await Promise.all(
+    liveQueries.map((query) => {
+      return fetchBrightDataEvidence({
+        query,
+        scannedAt,
+        serpApiKey,
+        webUnlockerApiKey,
+      });
+    })
+  );
+  const firstError:
+    | BrightDataEvidenceResult
+    | RemoteFetchError
+    | RemoteResponseError
+    | undefined = evidenceResults.find((result) => {
+    return result instanceof Error;
+  });
+
+  if (firstError instanceof Error) {
+    return firstError;
+  }
+
+  const successfulEvidenceResults: BrightDataEvidenceResult[] =
+    evidenceResults.filter(isBrightDataEvidenceResult);
+  const evidenceByQueryId: Record<string, Evidence[]> = successfulEvidenceResults.reduce(
+    (accumulator, result) => {
+      return {
+        ...accumulator,
+        [result.queryId]: result.evidence,
+      };
+    },
+    {} as Record<string, Evidence[]>
+  );
+
+  return queries.map((query) => {
+    const liveEvidence: Evidence[] = evidenceByQueryId[query.id] || [];
+
+    if (liveEvidence.length === 0) {
+      return query;
+    }
+
+    return {
+      ...query,
+      evidence: liveEvidence.concat(query.evidence),
+    };
+  });
+}
+
+export function buildRiskQueries({
+  stack,
+  scannedAt,
+}: {
+  stack: DetectedStack;
+  scannedAt: string;
+}): RiskQuery[] {
+  const dependencyTargets: DetectedDependency[] = stack.dependencies.slice(0, 8);
+  const frameworkTargets: DetectedDependency[] = stack.frameworks
+    .map((framework) => {
+      return stack.dependencies.find((dependency) => {
+        return dependencyMatchesFramework({ dependency, framework });
+      });
+    })
+    .filter(isDetectedDependency)
+    .slice(0, 4);
+
+  const cveQueries: RiskQuery[] = dependencyTargets.map((dependency) => {
+    return buildDependencyRiskQuery({
+      dependency,
+      type: "cve",
+      scannedAt,
+    });
+  });
+
+  const advisoryQueries: RiskQuery[] = dependencyTargets.slice(0, 5).map((dependency) => {
+    return buildDependencyRiskQuery({
+      dependency,
+      type: "security_advisory",
+      scannedAt,
+    });
+  });
+
+  const exploitQueries: RiskQuery[] = dependencyTargets.slice(0, 5).map((dependency) => {
+    return buildDependencyRiskQuery({
+      dependency,
+      type: "exploit_chatter",
+      scannedAt,
+    });
+  });
+
+  const deprecationQueries: RiskQuery[] = frameworkTargets.map((dependency) => {
+    return buildDependencyRiskQuery({
+      dependency,
+      type: "vendor_deprecation",
+      scannedAt,
+    });
+  });
+
+  const breakingReleaseQueries: RiskQuery[] = frameworkTargets.map((dependency) => {
+    return buildDependencyRiskQuery({
+      dependency,
+      type: "breaking_release",
+      scannedAt,
+    });
+  });
+
+  return [
+    ...cveQueries,
+    ...advisoryQueries,
+    ...exploitQueries,
+    ...deprecationQueries,
+    ...breakingReleaseQueries,
+  ];
+}
+
+function buildDependencyRiskQuery({
+  dependency,
+  type,
+  scannedAt,
+}: {
+  dependency: DetectedDependency;
+  type: FindingType;
+  scannedAt: string;
+}): RiskQuery {
+  const query = [
+    dependency.name,
+    dependency.version || "",
+    querySuffixForType({ type }),
+  ]
+    .filter((part) => {
+      return part.length > 0;
+    })
+    .join(" ");
+
+  return {
+    id: [type, dependency.ecosystem, dependency.name, dependency.version || "unknown"]
+      .join(":")
+      .toLowerCase(),
+    type,
+    dependency,
+    query,
+    evidence: buildEvidenceForQuery({ dependency, type, query, scannedAt }),
+  };
+}
+
+function buildEvidenceForQuery({
+  dependency,
+  type,
+  query,
+  scannedAt,
+}: {
+  dependency: DetectedDependency;
+  type: FindingType;
+  query: string;
+  scannedAt: string;
+}): Evidence[] {
+  if (type === "cve") {
+    return [
+      {
+        sourceName: "NVD CVE Search",
+        sourceType: "cve_database",
+        url: buildUrl({
+          baseUrl: "https://nvd.nist.gov/vuln/search/results",
+          searchParam: "query",
+          value: query,
+        }),
+        observedAt: scannedAt,
+        summary: `CVE search prepared for ${dependency.name} ${dependency.version || ""}`.trim(),
+      },
+    ];
+  }
+
+  if (type === "security_advisory") {
+    return [
+      {
+        sourceName: "GitHub Security Advisories",
+        sourceType: "official_advisory",
+        url: buildUrl({
+          baseUrl: "https://github.com/advisories",
+          searchParam: "query",
+          value: dependency.name,
+        }),
+        observedAt: scannedAt,
+        summary: `Advisory search prepared for ${dependency.name}`,
+      },
+    ];
+  }
+
+  if (type === "exploit_chatter") {
+    return [
+      {
+        sourceName: "BleepingComputer Search",
+        sourceType: "news",
+        url: buildUrl({
+          baseUrl: "https://www.bleepingcomputer.com/search/",
+          searchParam: "q",
+          value: query,
+        }),
+        observedAt: scannedAt,
+        summary: `Exploit and incident chatter search prepared for ${dependency.name}`,
+      },
+      {
+        sourceName: "X Search",
+        sourceType: "social_chatter",
+        url: buildUrl({
+          baseUrl: "https://x.com/search",
+          searchParam: "q",
+          value: query,
+        }),
+        observedAt: scannedAt,
+        summary: `Social exploit chatter search prepared for ${dependency.name}`,
+      },
+    ];
+  }
+
+  return [
+    {
+      sourceName: "Vendor Release Notes",
+      sourceType: "vendor_changelog",
+      url: vendorEvidenceUrl({ dependency }),
+      observedAt: scannedAt,
+      summary: `Release and deprecation search prepared for ${dependency.name}`,
+    },
+  ];
+}
+
+function isBrightDataEvidenceResult(
+  value: BrightDataEvidenceResult | RemoteFetchError | RemoteResponseError
+): value is BrightDataEvidenceResult {
+  return !(value instanceof Error);
+}
+
+function isEvidence(
+  value: Evidence | RemoteFetchError | RemoteResponseError
+): value is Evidence {
+  return !(value instanceof Error);
+}
+
+async function fetchBrightDataEvidence({
+  query,
+  scannedAt,
+  serpApiKey,
+  webUnlockerApiKey,
+}: {
+  query: RiskQuery;
+  scannedAt: string;
+  serpApiKey: string;
+  webUnlockerApiKey: string;
+}): Promise<BrightDataEvidenceResult | RemoteFetchError | RemoteResponseError> {
+  const searchUrl: string = createGoogleSearchUrl({ query: query.query });
+  const serpRaw = await fetchBrightDataRawWithRetry({
+    attempt: 1,
+    operation: "Bright Data SERP request",
+    payload: {
+      zone: env.brightDataSerpZone,
+      url: searchUrl,
+      format: "raw",
+    },
+    apiKey: serpApiKey,
+  });
+
+  if (serpRaw instanceof Error) {
+    return serpRaw;
+  }
+
+  const resultUrls: string[] = extractResultUrls({
+    limit: BRIGHT_DATA_RESULT_LIMIT,
+    raw: serpRaw,
+  });
+
+  if (resultUrls.length === 0) {
+    return {
+      queryId: query.id,
+      evidence: [
+        {
+          sourceName: "Bright Data SERP",
+          sourceType: "search_query",
+          url: searchUrl,
+          observedAt: scannedAt,
+          summary: `Bright Data returned raw SERP content for "${query.query}", but no external result URL was extracted.`,
+        },
+      ],
+    };
+  }
+
+  const scrapedEvidence = await Promise.all(
+    resultUrls.map((url) => {
+      return scrapeBrightDataResultUrl({
+        query,
+        scannedAt,
+        url,
+        webUnlockerApiKey,
+      });
+    })
+  );
+  const firstError:
+    | Evidence
+    | RemoteFetchError
+    | RemoteResponseError
+    | undefined = scrapedEvidence.find((result) => {
+    return result instanceof Error;
+  });
+
+  if (firstError instanceof Error) {
+    return firstError;
+  }
+
+  const successfulEvidence: Evidence[] = scrapedEvidence.filter(isEvidence);
+
+  return {
+    queryId: query.id,
+    evidence: successfulEvidence,
+  };
+}
+
+async function scrapeBrightDataResultUrl({
+  query,
+  scannedAt,
+  url,
+  webUnlockerApiKey,
+}: {
+  query: RiskQuery;
+  scannedAt: string;
+  url: string;
+  webUnlockerApiKey: string;
+}): Promise<Evidence | RemoteFetchError | RemoteResponseError> {
+  const raw = await fetchBrightDataRawWithRetry({
+    attempt: 1,
+    operation: "Bright Data Web Unlocker request",
+    payload: {
+      zone: env.brightDataWebUnlockerZone,
+      url,
+      format: "raw",
+    },
+    apiKey: webUnlockerApiKey,
+  });
+
+  if (raw instanceof Error) {
+    return raw;
+  }
+
+  return {
+    sourceName: "Bright Data Web Unlocker",
+    sourceType: sourceTypeForFindingType({ type: query.type }),
+    url,
+    observedAt: scannedAt,
+    summary: summarizeRawEvidence({
+      raw,
+      query: query.query,
+    }),
+  };
+}
+
+async function fetchBrightDataRawWithRetry({
+  apiKey,
+  attempt,
+  operation,
+  payload,
+}: {
+  apiKey: string;
+  attempt: number;
+  operation: string;
+  payload: BrightDataRequestPayload;
+}): Promise<RemoteFetchError | RemoteResponseError | string> {
+  const result = await fetchBrightDataRaw({
+    apiKey,
+    operation,
+    payload,
+  });
+
+  if (!(result instanceof Error)) {
+    return result;
+  }
+
+  if (attempt >= BRIGHT_DATA_ATTEMPTS) {
+    return result;
+  }
+
+  console.warn("bright_data_request_retry", {
+    attempt,
+    operation,
+    url: payload.url,
+    zone: payload.zone,
+    error: result.message,
+  });
+
+  await delay({
+    ms: brightDataRetryDelay({ attempt }),
+  });
+
+  return fetchBrightDataRawWithRetry({
+    apiKey,
+    attempt: attempt + 1,
+    operation,
+    payload,
+  });
+}
+
+async function fetchBrightDataRaw({
+  apiKey,
+  operation,
+  payload,
+}: {
+  apiKey: string;
+  operation: string;
+  payload: BrightDataRequestPayload;
+}): Promise<RemoteFetchError | RemoteResponseError | string> {
+  const response = await fetch(BRIGHT_DATA_REQUEST_URL, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  }).catch((cause: unknown) => {
+    return new RemoteFetchError({
+      operation,
+      url: BRIGHT_DATA_REQUEST_URL,
+      cause,
+    });
+  });
+
+  if (response instanceof Error) {
+    return response;
+  }
+
+  const body = await response.text().catch((cause: unknown) => {
+    return new RemoteFetchError({
+      operation,
+      url: payload.url,
+      cause,
+    });
+  });
+
+  if (body instanceof Error) {
+    return body;
+  }
+
+  if (!response.ok) {
+    return new RemoteResponseError({
+      operation,
+      status: response.status,
+      url: BRIGHT_DATA_REQUEST_URL,
+      body: body.slice(0, 800),
+    });
+  }
+
+  return body;
+}
+
+function createGoogleSearchUrl({ query }: { query: string }): string {
+  const url = new URL("https://www.google.com/search");
+  url.searchParams.set("q", query);
+  return url.toString();
+}
+
+function extractResultUrls({
+  limit,
+  raw,
+}: {
+  limit: number;
+  raw: string;
+}): string[] {
+  const urlMatches: RegExpMatchArray | null = raw.match(/https?:\/\/[^\s"'<>)]*/g);
+  const rawUrls: string[] = urlMatches ? Array.from(urlMatches) : [];
+  const normalizedUrls: string[] = rawUrls
+    .map((url) => {
+      return normalizeResultUrl({ url });
+    })
+    .filter(isString)
+    .filter((url) => {
+      return !isSearchEngineUrl({ url });
+    });
+
+  return dedupeStrings({ values: normalizedUrls }).slice(0, limit);
+}
+
+function normalizeResultUrl({ url }: { url: string }): string | null {
+  const trimmedUrl: string = url
+    .replaceAll("&amp;", "&")
+    .replace(/[\\.,;:\]]+$/g, "");
+  const parsedUrl = safeUrl({ url: trimmedUrl });
+
+  if (parsedUrl instanceof Error) {
+    return null;
+  }
+
+  const nestedUrl: string | null = parsedUrl.searchParams.get("q");
+
+  if (!nestedUrl) {
+    return parsedUrl.toString();
+  }
+
+  const nestedParsedUrl = safeUrl({ url: nestedUrl });
+
+  if (nestedParsedUrl instanceof Error) {
+    return parsedUrl.toString();
+  }
+
+  return nestedParsedUrl.toString();
+}
+
+function safeUrl({ url }: { url: string }): TypeError | URL {
+  const parsedUrl = errore.try({
+    try: () => {
+      return new URL(url);
+    },
+    catch: (cause) => {
+      return new TypeError("URL could not be parsed", { cause });
+    },
+  });
+
+  return parsedUrl;
+}
+
+function isSearchEngineUrl({ url }: { url: string }): boolean {
+  const parsedUrl = safeUrl({ url });
+
+  if (parsedUrl instanceof Error) {
+    return true;
+  }
+
+  return [
+    "google.com",
+    "www.google.com",
+    "accounts.google.com",
+    "gstatic.com",
+    "www.gstatic.com",
+    "schema.org",
+  ].includes(parsedUrl.hostname);
+}
+
+function sourceTypeForFindingType({
+  type,
+}: {
+  type: FindingType;
+}): Evidence["sourceType"] {
+  if (type === "cve") {
+    return "cve_database";
+  }
+
+  if (type === "security_advisory") {
+    return "official_advisory";
+  }
+
+  if (type === "exploit_chatter") {
+    return "news";
+  }
+
+  return "vendor_changelog";
+}
+
+function summarizeRawEvidence({
+  query,
+  raw,
+}: {
+  query: string;
+  raw: string;
+}): string {
+  const compactText: string = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+
+  if (compactText.length === 0) {
+    return `Bright Data unlocked a candidate evidence page for "${query}".`;
+  }
+
+  return compactText;
+}
+
+function dedupeStrings({ values }: { values: string[] }): string[] {
+  return values.reduce((accumulator, value) => {
+    if (accumulator.includes(value)) {
+      return accumulator;
+    }
+
+    return accumulator.concat(value);
+  }, [] as string[]);
+}
+
+function isString(value: string | null): value is string {
+  return typeof value === "string";
+}
+
+function brightDataRetryDelay({ attempt }: { attempt: number }): number {
+  return Math.min(1000 * 2 ** (attempt - 1), 4000);
+}
+
+function delay({ ms }: { ms: number }): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function querySuffixForType({ type }: { type: FindingType }): string {
+  if (type === "cve") {
+    return "CVE vulnerability";
+  }
+
+  if (type === "security_advisory") {
+    return "security advisory";
+  }
+
+  if (type === "exploit_chatter") {
+    return "exploit attack incident";
+  }
+
+  if (type === "vendor_deprecation") {
+    return "deprecated end of life migration";
+  }
+
+  return "breaking release migration";
+}
+
+function vendorEvidenceUrl({
+  dependency,
+}: {
+  dependency: DetectedDependency;
+}): string {
+  const framework =
+    Object.keys(VENDOR_EVIDENCE_URLS).find((candidate) => {
+      return dependencyMatchesFramework({ dependency, framework: candidate });
+    }) || "";
+
+  if (framework) {
+    return VENDOR_EVIDENCE_URLS[framework] || "https://github.com/advisories";
+  }
+
+  return buildUrl({
+    baseUrl: "https://github.com/search",
+    searchParam: "q",
+    value: `${dependency.name} releases deprecation`,
+  });
+}
+
+function dependencyMatchesFramework({
+  dependency,
+  framework,
+}: {
+  dependency: DetectedDependency;
+  framework: string;
+}): boolean {
+  const dependencyName = dependency.name.toLowerCase();
+  const normalizedFramework = framework.toLowerCase();
+
+  if (normalizedFramework === "next.js") {
+    return dependencyName === "next";
+  }
+
+  if (normalizedFramework === "spring boot") {
+    return dependencyName.includes("spring-boot");
+  }
+
+  return (
+    dependencyName === normalizedFramework ||
+    dependencyName.includes(normalizedFramework.replaceAll(" ", "-"))
+  );
+}
+
+function buildUrl({
+  baseUrl,
+  searchParam,
+  value,
+}: {
+  baseUrl: string;
+  searchParam: string;
+  value: string;
+}): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set(searchParam, value);
+  return url.toString();
+}
+
+function isDetectedDependency(
+  value: DetectedDependency | undefined
+): value is DetectedDependency {
+  return Boolean(value);
+}
