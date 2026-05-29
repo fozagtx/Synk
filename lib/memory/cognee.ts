@@ -84,6 +84,7 @@ export async function rememberScanReport({
 }
 
 function getCogneeConfig(): CogneeConfig | CogneeConfigurationError {
+  const serviceUrl: string | null = env.cogneeServiceUrl;
   const missingEnv: string[] = getMissingCogneeEnvNames();
 
   if (missingEnv.length > 0) {
@@ -92,14 +93,24 @@ function getCogneeConfig(): CogneeConfig | CogneeConfigurationError {
     });
   }
 
+  if (serviceUrl === null) {
+    return new CogneeConfigurationError({
+      missing: "COGNEE_SERVICE_URL",
+    });
+  }
+
   return {
     apiKey: env.cogneeApiKey,
     datasetName: env.cogneeDatasetName,
-    serviceUrl: env.cogneeServiceUrl,
+    serviceUrl,
   };
 }
 
 function getMissingCogneeEnvNames(): string[] {
+  if (env.cogneeServiceUrl === null) {
+    return ["COGNEE_SERVICE_URL"];
+  }
+
   return [];
 }
 

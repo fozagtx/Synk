@@ -42,9 +42,8 @@ COGNEE_DATASET_NAME=synk-memory
 This repo includes `render.yaml` for a Render Blueprint:
 
 - `synk-web`: the public Next.js app.
-- `synk-cognee`: an internal Cognee memory service.
 
-The free Render Blueprint does not attach persistent disk storage to Cognee. Memory can reset after redeploys or restarts. For durable memory, enable Render billing and add a disk at `/app/cognee/.data_storage`.
+Cognee memory is optional on Render. The app still scans, saves browser run history, opens Advisor, and generates fix reports without Cognee. To use external Cognee memory later, set `COGNEE_SERVICE_URL` to a reachable Cognee REST service.
 
 In Render, fill these secrets when the Blueprint asks:
 
@@ -53,11 +52,7 @@ SERP_API_KEY=
 WEBUNLOCKER_API_KEY=
 AIMLAPI_API_KEY=
 SPEECHMATICS_API_KEY=
-LLM_API_KEY=
-EMBEDDING_API_KEY=
 ```
-
-Use the same AI/ML API key for `AIMLAPI_API_KEY`, `LLM_API_KEY`, and `EMBEDDING_API_KEY` unless you intentionally split providers.
 
 Blueprint link after pushing this repo:
 

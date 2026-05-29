@@ -9,7 +9,7 @@ export interface Env {
   speechmaticsApiKey: string | null;
   speechmaticsBatchBaseUrl: string;
   speechmaticsRealtimeUrl: string;
-  cogneeServiceUrl: string;
+  cogneeServiceUrl: string | null;
   cogneeApiKey: string | null;
   cogneeDatasetName: string;
 }
@@ -59,7 +59,7 @@ export function getMissingEnvNames({
     });
 }
 
-export function readCogneeServiceUrl(): string {
+export function readCogneeServiceUrl(): string | null {
   const explicitUrl: string | null = readOptionalEnv({
     name: "COGNEE_SERVICE_URL",
   });
@@ -76,7 +76,7 @@ export function readCogneeServiceUrl(): string {
     return `http://${renderHostport}`;
   }
 
-  return "http://localhost:8000";
+  return null;
 }
 
 export const env: Env = {

@@ -86,11 +86,11 @@ export function GET(): Response {
       isWired: true,
       requirements: getCogneeRequirements(),
       wiredDetail:
-        "Wired into /api/scan; completed scan reports are remembered through the local Cognee Docker REST service at COGNEE_SERVICE_URL.",
+        "Wired into /api/scan; completed scan reports are remembered when COGNEE_SERVICE_URL points at a Cognee REST service.",
       configuredDetail:
         "Cognee memory is configured for scan-run memory writes.",
       missingDetail:
-        "Cognee memory cannot write scan runs because provider config is absent.",
+        "Cognee memory is optional and currently disabled.",
     }),
   ];
 
@@ -101,7 +101,7 @@ export function GET(): Response {
 }
 
 function getCogneeRequirements(): EnvRequirement[] {
-  return [];
+  return [{ name: "COGNEE_SERVICE_URL", value: env.cogneeServiceUrl }];
 }
 
 function createIntegrationStatusItem({
