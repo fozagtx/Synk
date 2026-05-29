@@ -1,10 +1,10 @@
 import { createAIMLAPI } from "@ai-ml.api/aimlapi-vercel-ai";
-import type { LanguageModelV2 } from "@ai-sdk/provider";
+import type { LanguageModel } from "ai";
 
 import { env } from "@/lib/env";
 import { AIProviderConfigurationError } from "@/lib/scan/errors";
 
-export function getCveSorterModel(): AIProviderConfigurationError | LanguageModelV2 {
+export function getCveSorterModel(): AIProviderConfigurationError | LanguageModel {
   if (!env.aimlapiApiKey) {
     return new AIProviderConfigurationError({
       missing: "AIMLAPI_API_KEY",

@@ -62,11 +62,12 @@ export function GET(): Response {
     }),
     createIntegrationStatusItem({
       name: "AI/ML API",
-      isWired: false,
+      isWired: true,
       requirements: [{ name: "AIMLAPI_API_KEY", value: env.aimlapiApiKey }],
-      wiredDetail: "AI/ML API is wired into the scan route.",
+      wiredDetail:
+        "Wired into the scan route through AI SDK structured output; findings are normalized after Bright Data evidence collection.",
       configuredDetail:
-        "AIMLAPI_API_KEY is present, but the current scan route does not call the model.",
+        "AI/ML API is configured for evidence normalization.",
       missingDetail: "AI/ML API model calls are unavailable.",
     }),
     createIntegrationStatusItem({
@@ -79,25 +80,6 @@ export function GET(): Response {
       configuredDetail:
         "SPEECHMATICS_API_KEY is present, but Speechmatics is not wired.",
       missingDetail: "Speechmatics transcription is unavailable.",
-    }),
-    createIntegrationStatusItem({
-      name: "Spectrum iMessage",
-      isWired: true,
-      requirements: [
-        {
-          name: "SPECTRUM_PROJECT_ID or PROJECT_ID",
-          value: env.spectrumProjectId,
-        },
-        {
-          name: "SPECTRUM_PROJECT_SECRET or SECRET_KEY",
-          value: env.spectrumProjectSecret,
-        },
-      ],
-      wiredDetail:
-        "Wired at /api/spectrum/imessage/test; checks the Spectrum iMessage channel and returns the sender only when Spectrum exposes a dedicated phone.",
-      configuredDetail:
-        "Spectrum project credentials are present for iMessage channel checks.",
-      missingDetail: "Spectrum iMessage cannot be checked yet.",
     }),
     createIntegrationStatusItem({
       name: "Cognee memory",

@@ -2,39 +2,65 @@
 
 ![Handwritten Synk system design](public/synk-system-design.png)
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Synk scans a GitHub repository, reads dependency and stack evidence, checks public threat, release, and deprecation signals, then turns the result into action-ready fixes a developer can paste into an IDE.
 
-## Getting Started
+## What It Does
 
-First, run the development server:
+- Scans GitHub repository manifests and stack files.
+- Uses Bright Data SERP and Web Unlocker for public CVE, exploit, advisory, release, and deprecation evidence.
+- Uses AI/ML API through the Vercel AI SDK to normalize findings into strict risk records.
+- Stores scan memory through Cognee, so the Advisor can reason over previous high-risk findings.
+- Generates fix prompts and downloadable team reports from saved runs.
+
+## Local Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run build
+npm run start -- --port 3100
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Optional Cognee memory service:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run cognee:up
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Required local environment names:
 
-## Learn More
+```dotenv
+SERP_API_KEY=
+WEBUNLOCKER_API_KEY=
+AIMLAPI_API_KEY=
+SPEECHMATICS_API_KEY=
+COGNEE_SERVICE_URL=http://localhost:8000
+COGNEE_DATASET_NAME=synk-memory
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy On Render
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This repo includes `render.yaml` for a Render Blueprint:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `synk-web`: the public Next.js app.
+- `synk-cognee`: an internal Cognee memory service.
 
-## Deploy on Vercel
+The free Render Blueprint does not attach persistent disk storage to Cognee. Memory can reset after redeploys or restarts. For durable memory, enable Render billing and add a disk at `/app/cognee/.data_storage`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+In Render, fill these secrets when the Blueprint asks:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```dotenv
+SERP_API_KEY=
+WEBUNLOCKER_API_KEY=
+AIMLAPI_API_KEY=
+SPEECHMATICS_API_KEY=
+LLM_API_KEY=
+EMBEDDING_API_KEY=
+```
+
+Use the same AI/ML API key for `AIMLAPI_API_KEY`, `LLM_API_KEY`, and `EMBEDDING_API_KEY` unless you intentionally split providers.
+
+Blueprint link after pushing this repo:
+
+```text
+https://dashboard.render.com/blueprint/new?repo=https://github.com/fozagtx/Synk
+```

@@ -1,0 +1,82 @@
+services:
+  - type: web
+    name: synk-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: SERP_API_KEY
+        sync: false
+      - key: WEBUNLOCKER_API_KEY
+        sync: false
+      - key: AIMLAPI_API_KEY
+        sync: false
+      - key: AIMLAPI_BASE_URL
+        value: https://api.aimlapi.com/v1
+      - key: AIMLAPI_MODEL
+        value: gpt-4o
+      - key: SPEECHMATICS_API_KEY
+        sync: false
+      - key: SPEECHMATICS_BATCH_BASE_URL
+        value: https://eu1.asr.api.speechmatics.com/v2
+      - key: SPEECHMATICS_REALTIME_URL
+        value: wss://eu.rt.speechmatics.com/v2
+      - key: COGNEE_DATASET_NAME
+        value: synk-memory
+      - key: COGNEE_HOSTPORT
+        fromService:
+          name: synk-cognee
+          type: pserv
+          property: hostport
+
+  - type: pserv
+    name: synk-cognee
+    runtime: image
+    image:
+      url: docker.io/cognee/cognee:main
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: LLM_PROVIDER
+        value: custom
+      - key: LLM_MODEL
+        value: openai/gpt-4o
+      - key: LLM_ENDPOINT
+        value: https://api.aimlapi.com/v1
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_INSTRUCTOR_MODE
+        value: json_mode
+      - key: EMBEDDING_PROVIDER
+        value: openai_compatible
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: EMBEDDING_ENDPOINT
+        value: https://api.aimlapi.com/v1
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: EMBEDDING_DIMENSIONS
+        value: "1536"
+      - key: DB_PROVIDER
+        value: sqlite
+      - key: GRAPH_DATABASE_PROVIDER
+        value: kuzu
+      - key: VECTOR_DB_PROVIDER
+        value: lancedb
+      - key: SYSTEM_ROOT_DIRECTORY
+        value: /app/cognee/.data_storage/system
+      - key: REQUIRE_AUTHENTICATION
+        value: "false"
+      - key: ENABLE_BACKEND_ACCESS_CONTROL
+        value: "false"
+      - key: COGNEE_SKIP_CONNECTION_TEST
+        value: "true"

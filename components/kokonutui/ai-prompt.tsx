@@ -35,6 +35,8 @@ interface AIPromptProps {
   headerText: string;
   onSubmit: (value: string) => Promise<void> | void;
   placeholder: string;
+  submitAriaLabel: string;
+  submitLabel: string;
 }
 
 interface BrowserAudioWindow extends Window {
@@ -100,7 +102,7 @@ class VoiceTranscriptionResponseError extends errore.createTaggedError({
 
 class VoiceTranscriptionResponseShapeError extends errore.createTaggedError({
   name: "VoiceTranscriptionResponseShapeError",
-  message: "Speechmatics transcription response did not match the UI contract",
+  message: "Speechmatics transcription response did not match the UI shape",
 }) {}
 
 export default function AI_Prompt({
@@ -109,6 +111,8 @@ export default function AI_Prompt({
   headerText,
   onSubmit,
   placeholder,
+  submitAriaLabel,
+  submitLabel,
 }: AIPromptProps): ReactElement {
   const [value, setValue] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -259,7 +263,7 @@ export default function AI_Prompt({
                   )}
                 </button>
                 <GradientButton
-                  aria-label="Run agent scan"
+                  aria-label={submitAriaLabel}
                   className="h-12 rounded-xl px-5 disabled:cursor-not-allowed disabled:opacity-40"
                   disabled={
                     disabled || isTranscribing || value.trim().length === 0
@@ -271,7 +275,7 @@ export default function AI_Prompt({
                   variant="blue"
                 >
                   <span className="font-semibold text-sm text-white">
-                    {disabled ? "Running" : "Run"}
+                    {disabled ? "Running" : submitLabel}
                   </span>
                   <ArrowRightIcon
                     className={cn(

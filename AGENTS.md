@@ -67,7 +67,7 @@ import * as errore from "errore";
 - Do not read secrets with `process.env` directly in TypeScript.
 - Find the closest `env.ts` file that exports a typed `env` object and use that.
 - If no `env.ts` exists near the code that needs secrets, create one before using secrets.
-- The `env.ts` file is the visible contract for which secrets exist and which need to be added.
+- The `env.ts` file is the visible list of which secrets exist and which need to be added.
 - Do not run mutating Doppler commands.
 - For tests or scripts that already wrap Doppler, use the package script rather than invoking Doppler directly.
 
@@ -125,6 +125,7 @@ const javascript = dedent;
 - Keep changes minimal and directly related to the current request.
 - Match the existing repository style even when it differs from personal preference.
 - Do not revert unrelated changes.
+- Never seed demo data, browser storage, localStorage, saved runs, or mock run history unless explicitly requested.
 - Prefer `rg` for code search.
 - Use non-interactive commands with flags.
 - Always use non-interactive git diff: `git --no-pager diff` or `git diff | cat`.

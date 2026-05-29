@@ -10,6 +10,11 @@ export class InvalidScanRequestError extends errore.createTaggedError({
   message: "$field is invalid: $reason",
 }) {}
 
+export class InvalidAdvisorRequestError extends errore.createTaggedError({
+  name: "InvalidAdvisorRequestError",
+  message: "$field is invalid: $reason",
+}) {}
+
 export class UnsupportedGithubUrlError extends errore.createTaggedError({
   name: "UnsupportedGithubUrlError",
   message: "Unsupported GitHub repository URL: $githubUrl",
@@ -43,6 +48,16 @@ export class NoManifestFilesError extends errore.createTaggedError({
 export class AIProviderConfigurationError extends errore.createTaggedError({
   name: "AIProviderConfigurationError",
   message: "AI provider is not configured: $missing",
+}) {}
+
+export class AIProviderCallError extends errore.createTaggedError({
+  name: "AIProviderCallError",
+  message: "AI provider failed while running $operation",
+}) {}
+
+export class AIProviderResponseShapeError extends errore.createTaggedError({
+  name: "AIProviderResponseShapeError",
+  message: "AI provider returned an invalid response for $operation: $reason",
 }) {}
 
 export class VoiceProviderConfigurationError extends errore.createTaggedError({
@@ -79,6 +94,7 @@ export class InvalidWorkflowEventError extends errore.createTaggedError({
 export type ScanError =
   | InvalidJsonError
   | InvalidScanRequestError
+  | InvalidAdvisorRequestError
   | UnsupportedGithubUrlError
   | RemoteConfigurationError
   | RemoteFetchError
@@ -86,6 +102,8 @@ export type ScanError =
   | RemoteJsonShapeError
   | NoManifestFilesError
   | AIProviderConfigurationError
+  | AIProviderCallError
+  | AIProviderResponseShapeError
   | VoiceProviderConfigurationError
   | InvalidVoiceRequestError
   | VoiceTranscriptionTimeoutError

@@ -9,8 +9,6 @@ export interface Env {
   speechmaticsApiKey: string | null;
   speechmaticsBatchBaseUrl: string;
   speechmaticsRealtimeUrl: string;
-  spectrumProjectId: string | null;
-  spectrumProjectSecret: string | null;
   cogneeServiceUrl: string;
   cogneeApiKey: string | null;
   cogneeDatasetName: string;
@@ -47,21 +45,6 @@ export function readEnvWithDefault({
   return readOptionalEnv({ name }) ?? value;
 }
 
-export function readFirstOptionalEnv({
-  names,
-}: {
-  names: string[];
-}): string | null {
-  const values: Array<string | null> = names.map((name) => {
-    return readOptionalEnv({ name });
-  });
-  const value: string | null | undefined = values.find((item) => {
-    return item !== null;
-  });
-
-  return value ?? null;
-}
-
 export function getMissingEnvNames({
   requirements,
 }: {
@@ -74,6 +57,26 @@ export function getMissingEnvNames({
     .map((requirement) => {
       return requirement.name;
     });
+}
+
+export function readCogneeServiceUrl(): string {
+  const explicitUrl: string | null = readOptionalEnv({
+    name: "COGNEE_SERVICE_URL",
+  });
+
+  if (explicitUrl !== null) {
+    return explicitUrl;
+  }
+
+  const renderHostport: string | null = readOptionalEnv({
+    name: "COGNEE_HOSTPORT",
+  });
+
+  if (renderHostport !== null) {
+    return `http://${renderHostport}`;
+  }
+
+  return "http://localhost:8000";
 }
 
 export const env: Env = {
@@ -101,21 +104,7 @@ export const env: Env = {
     name: "SPEECHMATICS_REALTIME_URL",
     value: "wss://eu.rt.speechmatics.com/v2",
   }),
-  spectrumProjectId: readFirstOptionalEnv({
-    names: ["SPECTRUM_PROJECT_ID", "PROJECT_ID"],
-  }),
-  spectrumProjectSecret: readFirstOptionalEnv({
-    names: [
-      "SPECTRUM_PROJECT_SECRET",
-      "SPECTRUM_SECRET_KEY",
-      "PROJECT_SECRET",
-      "SECRET_KEY",
-    ],
-  }),
-  cogneeServiceUrl: readEnvWithDefault({
-    name: "COGNEE_SERVICE_URL",
-    value: "http://localhost:8000",
-  }),
+  cogneeServiceUrl: readCogneeServiceUrl(),
   cogneeApiKey: readOptionalEnv({ name: "COGNEE_API_KEY" }),
   cogneeDatasetName: readEnvWithDefault({
     name: "COGNEE_DATASET_NAME",

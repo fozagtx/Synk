@@ -122,6 +122,12 @@ export interface ReportSummary {
   topAction: string;
 }
 
+export interface AgentTraceStep {
+  name: string;
+  status: "completed" | "failed";
+  detail: string;
+}
+
 export interface ScanReport {
   scanId: string;
   scannedAt: string;
@@ -129,6 +135,7 @@ export interface ScanReport {
   stack: DetectedStack;
   summary: ReportSummary;
   groups: ReportGroups;
+  agentTrace?: AgentTraceStep[];
 }
 
 export type ScanMemoryStatus =

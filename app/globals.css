@@ -51,6 +51,14 @@
 :root {
   --resize-dur: 560ms;
   --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --icon-swap-dur: 200ms;
+  --icon-swap-blur: 2px;
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: ease-in-out;
+  --text-swap-dur: 150ms;
+  --text-swap-translate-y: 4px;
+  --text-swap-blur: 2px;
+  --text-swap-ease: ease-in-out;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -97,9 +105,81 @@
   will-change: grid-template-columns;
 }
 
+.t-icon-swap {
+  position: relative;
+  display: inline-grid;
+}
+
+.t-icon-swap .t-icon {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+  will-change: opacity, filter, transform;
+}
+
+.t-icon-swap[data-state="copy"] .t-icon[data-icon="copy"],
+.t-icon-swap[data-state="copied"] .t-icon[data-icon="copied"] {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+
+.t-icon-swap[data-state="copy"] .t-icon[data-icon="copied"],
+.t-icon-swap[data-state="copied"] .t-icon[data-icon="copy"] {
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+  transform: scale(var(--icon-swap-start-scale));
+}
+
+.t-copy-button {
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    box-shadow var(--text-swap-dur) var(--text-swap-ease);
+}
+
+.t-copy-button[data-copy-state="copied"] {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 12px 28px rgb(36 87 255 / 0.22);
+}
+
+.t-copy-label {
+  display: inline-block;
+  transform: translateY(0);
+  filter: blur(0);
+  opacity: 1;
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    opacity var(--text-swap-dur) var(--text-swap-ease);
+  will-change: transform, filter, opacity;
+}
+
+.t-copy-label[data-copy-state="copying"] {
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+  filter: blur(var(--text-swap-blur));
+  opacity: 0.72;
+}
+
+.t-copy-label[data-copy-state="copied"] {
+  transform: translateY(0);
+  filter: blur(0);
+  opacity: 1;
+}
+
+.t-copy-label[data-copy-state="error"] {
+  transform: translateY(var(--text-swap-translate-y));
+  filter: blur(0);
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .t-resize { transition: none !important; }
   .synk-resize-grid { transition: none !important; }
+  .t-icon-swap .t-icon { transition: none !important; }
+  .t-copy-button { transition: none !important; }
+  .t-copy-label { transition: none !important; }
 }
 
 .dark {
