@@ -84,17 +84,20 @@ export function GET(): Response {
       name: "Spectrum iMessage",
       isWired: true,
       requirements: [
-        { name: "SPECTRUM_PROJECT_ID", value: env.spectrumProjectId },
         {
-          name: "SPECTRUM_PROJECT_SECRET",
+          name: "SPECTRUM_PROJECT_ID or PROJECT_ID",
+          value: env.spectrumProjectId,
+        },
+        {
+          name: "SPECTRUM_PROJECT_SECRET or SECRET_KEY",
           value: env.spectrumProjectSecret,
         },
       ],
       wiredDetail:
-        "Wired at /api/spectrum/imessage/test; sends a test DM through Spectrum iMessage and returns the sender number when Spectrum exposes a dedicated phone.",
+        "Wired at /api/spectrum/imessage/test; checks the Spectrum iMessage channel and returns the sender only when Spectrum exposes a dedicated phone.",
       configuredDetail:
-        "Spectrum project credentials are present for iMessage messaging.",
-      missingDetail: "Spectrum iMessage cannot send messages yet.",
+        "Spectrum project credentials are present for iMessage channel checks.",
+      missingDetail: "Spectrum iMessage cannot be checked yet.",
     }),
     createIntegrationStatusItem({
       name: "Cognee memory",

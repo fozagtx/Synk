@@ -25,6 +25,11 @@ export class RemoteResponseError extends errore.createTaggedError({
   message: "$operation returned HTTP $status for $url: $body",
 }) {}
 
+export class RemoteConfigurationError extends errore.createTaggedError({
+  name: "RemoteConfigurationError",
+  message: "$provider is misconfigured: $reason",
+}) {}
+
 export class RemoteJsonShapeError extends errore.createTaggedError({
   name: "RemoteJsonShapeError",
   message: "$operation returned an unsupported response shape for $url",
@@ -75,6 +80,7 @@ export type ScanError =
   | InvalidJsonError
   | InvalidScanRequestError
   | UnsupportedGithubUrlError
+  | RemoteConfigurationError
   | RemoteFetchError
   | RemoteResponseError
   | RemoteJsonShapeError

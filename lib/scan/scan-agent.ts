@@ -6,6 +6,7 @@ import {
 } from "@/lib/scan/bright-data";
 import type {
   NoManifestFilesError,
+  RemoteConfigurationError,
   RemoteFetchError,
   RemoteJsonShapeError,
   RemoteResponseError,
@@ -27,6 +28,7 @@ export async function runScan({
   request: ScanRequest;
 }): Promise<
   | NoManifestFilesError
+  | RemoteConfigurationError
   | RemoteFetchError
   | RemoteJsonShapeError
   | RemoteResponseError

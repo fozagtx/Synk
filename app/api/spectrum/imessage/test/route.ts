@@ -7,7 +7,7 @@ import {
   toErrorCode,
 } from "@/lib/scan/errors";
 import {
-  sendSpectrumImessageTest,
+  checkSpectrumImessageChannel,
   type SpectrumImessageTestResult,
 } from "@/lib/messaging/spectrum-imessage";
 
@@ -46,12 +46,15 @@ export async function POST(request: Request): Promise<Response> {
     return failureResponse({ error: parsedRequest, status: 400 });
   }
 
-  const result = await sendSpectrumImessageTest({
+  const result = await checkSpectrumImessageChannel({
     recipientPhone: parsedRequest.recipientPhone,
   });
 
   if (errore.isError(result)) {
-    return failureResponse({ error: result, status: 502 });
+    return failureResponse({
+      error: result,
+      status: 502,
+    });
   }
 
   return Response.json({
@@ -64,7 +67,7 @@ function parseSpectrumImessageTestRequest({
   bodyText,
 }: {
   bodyText: string;
-}): InvalidJsonError | InvalidScanRequestError | { recipientPhone: string } {
+}): InvalidJsonError | InvalidScanRequestError | { recipientPhone: string | null } {
   const parsed = errore.try({
     try: () => {
       return JSON.parse(bodyText) as unknown;
@@ -86,6 +89,12 @@ function parseSpectrumImessageTestRequest({
   }
 
   const recipientPhone = parsed.recipientPhone;
+
+  if (typeof recipientPhone === "undefined" || recipientPhone === null) {
+    return {
+      recipientPhone: null,
+    };
+  }
 
   if (typeof recipientPhone !== "string") {
     return new InvalidScanRequestError({

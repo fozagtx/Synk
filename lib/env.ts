@@ -47,6 +47,21 @@ export function readEnvWithDefault({
   return readOptionalEnv({ name }) ?? value;
 }
 
+export function readFirstOptionalEnv({
+  names,
+}: {
+  names: string[];
+}): string | null {
+  const values: Array<string | null> = names.map((name) => {
+    return readOptionalEnv({ name });
+  });
+  const value: string | null | undefined = values.find((item) => {
+    return item !== null;
+  });
+
+  return value ?? null;
+}
+
 export function getMissingEnvNames({
   requirements,
 }: {
@@ -86,8 +101,17 @@ export const env: Env = {
     name: "SPEECHMATICS_REALTIME_URL",
     value: "wss://eu.rt.speechmatics.com/v2",
   }),
-  spectrumProjectId: readOptionalEnv({ name: "SPECTRUM_PROJECT_ID" }),
-  spectrumProjectSecret: readOptionalEnv({ name: "SPECTRUM_PROJECT_SECRET" }),
+  spectrumProjectId: readFirstOptionalEnv({
+    names: ["SPECTRUM_PROJECT_ID", "PROJECT_ID"],
+  }),
+  spectrumProjectSecret: readFirstOptionalEnv({
+    names: [
+      "SPECTRUM_PROJECT_SECRET",
+      "SPECTRUM_SECRET_KEY",
+      "PROJECT_SECRET",
+      "SECRET_KEY",
+    ],
+  }),
   cogneeServiceUrl: readEnvWithDefault({
     name: "COGNEE_SERVICE_URL",
     value: "http://localhost:8000",

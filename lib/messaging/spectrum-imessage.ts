@@ -1,7 +1,5 @@
 import * as errore from "errore";
-import dedent from "string-dedent";
-import { Spectrum, type Space, type SpectrumInstance } from "spectrum-ts";
-import { imessage } from "spectrum-ts/providers/imessage";
+import { cloud, type TokenData } from "spectrum-ts";
 
 import { env } from "@/lib/env";
 
@@ -12,45 +10,24 @@ export class SpectrumImessageConfigurationError extends errore.createTaggedError
 
 export class SpectrumImessageStartupError extends errore.createTaggedError({
   name: "SpectrumImessageStartupError",
-  message: "Spectrum iMessage failed to start",
-}) {}
-
-export class SpectrumImessageSpaceError extends errore.createTaggedError({
-  name: "SpectrumImessageSpaceError",
-  message: "Spectrum iMessage failed to open a chat for $recipientPhone",
-}) {}
-
-export class SpectrumImessageSendError extends errore.createTaggedError({
-  name: "SpectrumImessageSendError",
-  message: "Spectrum iMessage failed to send a test message to $recipientPhone",
-}) {}
-
-export class SpectrumImessageStopError extends errore.createTaggedError({
-  name: "SpectrumImessageStopError",
-  message: "Spectrum iMessage failed to stop cleanly",
+  message: "Spectrum iMessage channel check failed",
 }) {}
 
 export interface SpectrumImessageTestResult {
   agentPhone: string | null;
   mode: "dedicated" | "shared_or_unknown";
-  recipientPhone: string;
-  status: "sent";
+  recipientPhone: string | null;
+  status: "ready";
 }
-
-type SpectrumImessageProvider = ReturnType<typeof imessage.config>;
-type SpectrumImessageApp = SpectrumInstance<[SpectrumImessageProvider]>;
 
 export type SpectrumImessageError =
   | SpectrumImessageConfigurationError
-  | SpectrumImessageStartupError
-  | SpectrumImessageSpaceError
-  | SpectrumImessageSendError
-  | SpectrumImessageStopError;
+  | SpectrumImessageStartupError;
 
-export async function sendSpectrumImessageTest({
+export async function checkSpectrumImessageChannel({
   recipientPhone,
 }: {
-  recipientPhone: string;
+  recipientPhone: string | null;
 }): Promise<SpectrumImessageError | SpectrumImessageTestResult> {
   const config = getSpectrumImessageConfig();
 
@@ -58,51 +35,24 @@ export async function sendSpectrumImessageTest({
     return config;
   }
 
-  const app = await startSpectrumImessageApp({
+  const tokenData = await getSpectrumImessageTokenData({
     projectId: config.projectId,
     projectSecret: config.projectSecret,
   });
 
-  if (app instanceof Error) {
-    return app;
+  if (tokenData instanceof Error) {
+    return tokenData;
   }
 
-  const space = await createImessageSpace({
-    app,
-    recipientPhone,
+  const agentPhone: string | null = resolveAgentPhoneFromTokenData({
+    tokenData,
   });
-
-  if (space instanceof Error) {
-    const stopResult = await stopSpectrumImessageApp({ app });
-
-    if (stopResult instanceof Error) {
-      return stopResult;
-    }
-
-    return space;
-  }
-
-  const sendResult = await sendImessageIntro({
-    recipientPhone,
-    space,
-  });
-  const stopResult = await stopSpectrumImessageApp({ app });
-
-  if (sendResult instanceof Error) {
-    return sendResult;
-  }
-
-  if (stopResult instanceof Error) {
-    return stopResult;
-  }
 
   return {
-    agentPhone: resolveAgentPhoneFromSpace({ space }),
-    mode: resolveAgentPhoneFromSpace({ space })
-      ? "dedicated"
-      : "shared_or_unknown",
+    agentPhone,
+    mode: tokenData.type === "dedicated" ? "dedicated" : "shared_or_unknown",
     recipientPhone,
-    status: "sent",
+    status: "ready",
   };
 }
 
@@ -113,8 +63,11 @@ function getSpectrumImessageConfig():
       projectSecret: string;
     } {
   const missing: string[] = [
-    { name: "SPECTRUM_PROJECT_ID", value: env.spectrumProjectId },
-    { name: "SPECTRUM_PROJECT_SECRET", value: env.spectrumProjectSecret },
+    { name: "SPECTRUM_PROJECT_ID or PROJECT_ID", value: env.spectrumProjectId },
+    {
+      name: "SPECTRUM_PROJECT_SECRET or SECRET_KEY",
+      value: env.spectrumProjectSecret,
+    },
   ]
     .filter((requirement) => {
       return requirement.value === null;
@@ -135,96 +88,30 @@ function getSpectrumImessageConfig():
   };
 }
 
-async function startSpectrumImessageApp({
+async function getSpectrumImessageTokenData({
   projectId,
   projectSecret,
 }: {
   projectId: string;
   projectSecret: string;
-}): Promise<SpectrumImessageApp | SpectrumImessageStartupError> {
-  return Spectrum({
-    projectId,
-    projectSecret,
-    providers: [imessage.config()],
-    telemetry: false,
-  }).catch((cause: unknown) => {
+}): Promise<TokenData | SpectrumImessageStartupError> {
+  return cloud.issueImessageTokens(projectId, projectSecret).catch((cause) => {
     return new SpectrumImessageStartupError({ cause });
   });
 }
 
-async function createImessageSpace({
-  app,
-  recipientPhone,
+function resolveAgentPhoneFromTokenData({
+  tokenData,
 }: {
-  app: SpectrumImessageApp;
-  recipientPhone: string;
-}): Promise<Space | SpectrumImessageSpaceError> {
-  const imessagePlatform = imessage(app);
-  const result = await errore.tryAsync({
-    try: () => {
-      return imessagePlatform.space(recipientPhone);
-    },
-    catch: (cause) => {
-      return new SpectrumImessageSpaceError({
-        recipientPhone,
-        cause,
-      });
-    },
-  });
-
-  return result;
-}
-
-function resolveAgentPhoneFromSpace({ space }: { space: Space }): string | null {
-  const maybeSpaceWithPhone = space as Space & { phone?: unknown };
-
-  if (
-    typeof maybeSpaceWithPhone.phone === "string" &&
-    maybeSpaceWithPhone.phone !== "shared"
-  ) {
-    return maybeSpaceWithPhone.phone;
+  tokenData: TokenData;
+}): string | null {
+  if (tokenData.type === "shared") {
+    return null;
   }
 
-  return null;
+  return Object.values(tokenData.numbers).find(isString) ?? null;
 }
 
-async function sendImessageIntro({
-  recipientPhone,
-  space,
-}: {
-  recipientPhone: string;
-  space: Space;
-}): Promise<SpectrumImessageSendError | void> {
-  const message = dedent`
-    Synk is online.
-
-    Send a public GitHub repo URL and I will scan it for CVEs, exploit chatter, deprecations, and breaking releases.
-  `;
-
-  return space.send(message).then(
-    () => {
-      return undefined;
-    },
-    (cause: unknown) => {
-      return new SpectrumImessageSendError({
-        recipientPhone,
-        cause,
-      });
-    }
-  );
-}
-
-async function stopSpectrumImessageApp({
-  app,
-}: {
-  app: SpectrumImessageApp;
-}): Promise<SpectrumImessageStopError | void> {
-  return app.stop().then(
-    () => {
-      return undefined;
-    },
-    (cause: unknown) => {
-      return new SpectrumImessageStopError({ cause });
-    }
-  );
+function isString(value: string | null): value is string {
+  return typeof value === "string" && value.length > 0;
 }

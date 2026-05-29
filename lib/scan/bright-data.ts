@@ -1,7 +1,11 @@
 import * as errore from "errore";
 
 import { env } from "@/lib/env";
-import { RemoteFetchError, RemoteResponseError } from "@/lib/scan/errors";
+import {
+  RemoteConfigurationError,
+  RemoteFetchError,
+  RemoteResponseError,
+} from "@/lib/scan/errors";
 import type {
   DetectedDependency,
   DetectedStack,
@@ -57,12 +61,23 @@ export async function enrichRiskQueriesWithBrightData({
 }: {
   queries: RiskQuery[];
   scannedAt: string;
-}): Promise<RemoteFetchError | RemoteResponseError | RiskQuery[]> {
+}): Promise<
+  RemoteConfigurationError | RemoteFetchError | RemoteResponseError | RiskQuery[]
+> {
   const serpApiKey: string | null = env.brightDataSerpApiKey;
   const webUnlockerApiKey: string | null = env.brightDataWebUnlockerApiKey;
 
   if (!serpApiKey || !webUnlockerApiKey) {
     return queries;
+  }
+
+  const credentialError = validateBrightDataCredentials({
+    serpApiKey,
+    webUnlockerApiKey,
+  });
+
+  if (credentialError) {
+    return credentialError;
   }
 
   const liveQueries: RiskQuery[] = queries.slice(0, BRIGHT_DATA_QUERY_LIMIT);
@@ -112,6 +127,34 @@ export async function enrichRiskQueriesWithBrightData({
       evidence: liveEvidence.concat(query.evidence),
     };
   });
+}
+
+function validateBrightDataCredentials({
+  serpApiKey,
+  webUnlockerApiKey,
+}: {
+  serpApiKey: string;
+  webUnlockerApiKey: string;
+}): RemoteConfigurationError | null {
+  const invalidNames: string[] = [
+    isAsciiCredential({ value: serpApiKey }) ? null : "SERP_API_KEY",
+    isAsciiCredential({ value: webUnlockerApiKey })
+      ? null
+      : "WEBUNLOCKER_API_KEY",
+  ].filter(isString);
+
+  if (invalidNames.length === 0) {
+    return null;
+  }
+
+  return new RemoteConfigurationError({
+    provider: "Bright Data",
+    reason: `${invalidNames.join(", ")} must contain only ASCII characters`,
+  });
+}
+
+function isAsciiCredential({ value }: { value: string }): boolean {
+  return /^[\x20-\x7E]+$/.test(value);
 }
 
 export function buildRiskQueries({
@@ -317,7 +360,7 @@ async function fetchBrightDataEvidence({
   const searchUrl: string = createGoogleSearchUrl({ query: query.query });
   const serpRaw = await fetchBrightDataRawWithRetry({
     attempt: 1,
-    operation: "Bright Data SERP request",
+    operation: "Bright Data SERP search",
     payload: {
       zone: env.brightDataSerpZone,
       url: searchUrl,
@@ -393,7 +436,7 @@ async function scrapeBrightDataResultUrl({
 }): Promise<Evidence | RemoteFetchError | RemoteResponseError> {
   const raw = await fetchBrightDataRawWithRetry({
     attempt: 1,
-    operation: "Bright Data Web Unlocker request",
+    operation: "Bright Data page extraction",
     payload: {
       zone: env.brightDataWebUnlockerZone,
       url,
@@ -407,7 +450,7 @@ async function scrapeBrightDataResultUrl({
   }
 
   return {
-    sourceName: "Bright Data Web Unlocker",
+    sourceName: sourceNameForFindingType({ type: query.type }),
     sourceType: sourceTypeForFindingType({ type: query.type }),
     url,
     observedAt: scannedAt,
@@ -508,11 +551,48 @@ async function fetchBrightDataRaw({
       operation,
       status: response.status,
       url: BRIGHT_DATA_REQUEST_URL,
-      body: body.slice(0, 800),
+      body: brightDataErrorBody({
+        body,
+        operation,
+        status: response.status,
+      }),
     });
   }
 
   return body;
+}
+
+function brightDataErrorBody({
+  body,
+  operation,
+  status,
+}: {
+  body: string;
+  operation: string;
+  status: number;
+}): string {
+  const compactBody: string = body.slice(0, 800);
+
+  if (
+    status === 401 &&
+    compactBody.toLowerCase().includes("auth method is not supported")
+  ) {
+    return `${compactBody}. Use the Bright Data API key for this product in ${brightDataEnvNameFromOperation({ operation })}; proxy credentials, webhook secrets, and zone ids are rejected by /request.`;
+  }
+
+  return compactBody;
+}
+
+function brightDataEnvNameFromOperation({
+  operation,
+}: {
+  operation: string;
+}): string {
+  if (operation.includes("Web Unlocker")) {
+    return "WEBUNLOCKER_API_KEY";
+  }
+
+  return "SERP_API_KEY";
 }
 
 function createGoogleSearchUrl({ query }: { query: string }): string {
@@ -528,43 +608,98 @@ function extractResultUrls({
   limit: number;
   raw: string;
 }): string[] {
-  const urlMatches: RegExpMatchArray | null = raw.match(/https?:\/\/[^\s"'<>)]*/g);
-  const rawUrls: string[] = urlMatches ? Array.from(urlMatches) : [];
+  const rawUrls: string[] = extractRawResultCandidates({ raw });
   const normalizedUrls: string[] = rawUrls
     .map((url) => {
       return normalizeResultUrl({ url });
     })
     .filter(isString)
     .filter((url) => {
-      return !isSearchEngineUrl({ url });
+      return isExternalResultUrl({ url });
     });
 
   return dedupeStrings({ values: normalizedUrls }).slice(0, limit);
 }
 
+function extractRawResultCandidates({ raw }: { raw: string }): string[] {
+  const decodedRaw: string = decodeHtmlEntities({ value: raw });
+  const hrefMatches: string[] = Array.from(
+    decodedRaw.matchAll(/\bhref=["']([^"']+)["']/g)
+  ).map((match) => {
+    return match[1] || "";
+  });
+  const urlMatches: RegExpMatchArray | null = decodedRaw.match(
+    /https?:\/\/[^\s"'<>)]*/g
+  );
+  const absoluteUrls: string[] = urlMatches ? Array.from(urlMatches) : [];
+
+  return hrefMatches.concat(absoluteUrls).filter((value) => {
+    return value.length > 0;
+  });
+}
+
 function normalizeResultUrl({ url }: { url: string }): string | null {
-  const trimmedUrl: string = url
-    .replaceAll("&amp;", "&")
-    .replace(/[\\.,;:\]]+$/g, "");
-  const parsedUrl = safeUrl({ url: trimmedUrl });
+  const trimmedUrl: string = decodeHtmlEntities({ value: url }).replace(
+    /[\\.,;:\]]+$/g,
+    ""
+  );
+  const parsedUrl = safeUrl({
+    url: isRelativeGoogleResultUrl({ url: trimmedUrl })
+      ? new URL(trimmedUrl, "https://www.google.com").toString()
+      : trimmedUrl,
+  });
 
   if (parsedUrl instanceof Error) {
     return null;
   }
 
-  const nestedUrl: string | null = parsedUrl.searchParams.get("q");
+  const nestedUrl: string | null =
+    parsedUrl.searchParams.get("q") || parsedUrl.searchParams.get("url");
 
   if (!nestedUrl) {
     return parsedUrl.toString();
   }
 
-  const nestedParsedUrl = safeUrl({ url: nestedUrl });
+  const decodedNestedUrl = safeDecodeUriComponent({ value: nestedUrl });
+  const nestedParsedUrl = safeUrl({
+    url: decodedNestedUrl instanceof Error ? nestedUrl : decodedNestedUrl,
+  });
 
   if (nestedParsedUrl instanceof Error) {
     return parsedUrl.toString();
   }
 
   return nestedParsedUrl.toString();
+}
+
+function decodeHtmlEntities({ value }: { value: string }): string {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("\\u0026", "&")
+    .replaceAll("\\u003d", "=")
+    .replaceAll("\\u003f", "?")
+    .replaceAll("\\u002f", "/");
+}
+
+function safeDecodeUriComponent({
+  value,
+}: {
+  value: string;
+}): URIError | string {
+  const decodedValue = errore.try({
+    try: () => {
+      return decodeURIComponent(value);
+    },
+    catch: (cause) => {
+      return new URIError("URL component could not be decoded", { cause });
+    },
+  });
+
+  return decodedValue;
+}
+
+function isRelativeGoogleResultUrl({ url }: { url: string }): boolean {
+  return url.startsWith("/url?") || url.startsWith("/interstitial?");
 }
 
 function safeUrl({ url }: { url: string }): TypeError | URL {
@@ -580,21 +715,52 @@ function safeUrl({ url }: { url: string }): TypeError | URL {
   return parsedUrl;
 }
 
-function isSearchEngineUrl({ url }: { url: string }): boolean {
+function isExternalResultUrl({ url }: { url: string }): boolean {
   const parsedUrl = safeUrl({ url });
 
   if (parsedUrl instanceof Error) {
-    return true;
+    return false;
   }
 
-  return [
-    "google.com",
-    "www.google.com",
-    "accounts.google.com",
-    "gstatic.com",
-    "www.gstatic.com",
-    "schema.org",
-  ].includes(parsedUrl.hostname);
+  const hostname: string = parsedUrl.hostname.toLowerCase();
+
+  if (
+    hostname.startsWith("google.") ||
+    hostname.includes(".google.") ||
+    hostname.endsWith(".gstatic.com") ||
+    hostname === "gstatic.com" ||
+    hostname.endsWith(".googleusercontent.com") ||
+    hostname === "googleusercontent.com" ||
+    hostname === "schema.org"
+  ) {
+    return false;
+  }
+
+  if (parsedUrl.pathname.startsWith("/websearch/answer/181196")) {
+    return false;
+  }
+
+  return parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:";
+}
+
+function sourceNameForFindingType({ type }: { type: FindingType }): string {
+  if (type === "cve") {
+    return "Live CVE source";
+  }
+
+  if (type === "security_advisory") {
+    return "Live advisory source";
+  }
+
+  if (type === "exploit_chatter") {
+    return "Live exploit source";
+  }
+
+  if (type === "vendor_deprecation") {
+    return "Live deprecation source";
+  }
+
+  return "Live release source";
 }
 
 function sourceTypeForFindingType({

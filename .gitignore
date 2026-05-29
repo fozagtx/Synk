@@ -25,6 +25,10 @@
 .DS_Store
 *.pem
 /docs/
+/.agents/skills/spectrum/
+/bismillah/
+/now/
+/.serena/cache/typescript/
 
 # debug
 npm-debug.log*

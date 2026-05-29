@@ -123,8 +123,8 @@ type IMessageTestApiResponse =
 type IMessageTestResult = {
   agentPhone: string | null;
   mode: "dedicated" | "shared_or_unknown";
-  recipientPhone: string;
-  status: "sent";
+  recipientPhone: string | null;
+  status: "ready";
 };
 
 type IMessageTestState =
@@ -638,22 +638,24 @@ function IMessageSetupPanel({
   const resolvedAgentPhone: string =
     state.status === "success" && state.result.agentPhone
       ? state.result.agentPhone
-      : "Returned after a real Spectrum test message when the channel exposes a dedicated sender";
+      : "This Spectrum project is shared mode or has no exposed dedicated sender.";
   const resolvedMode: string =
     state.status === "success" && state.result.mode === "dedicated"
       ? "Dedicated sender"
-      : "Unknown until test";
+      : state.status === "success"
+        ? "Shared channel"
+        : "Check required";
 
   return (
     <section className="grid gap-4 rounded-xl border border-[#e1e4ea] bg-white p-4 shadow-[0_12px_30px_rgb(16_24_40/0.08)]">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="font-semibold text-[#202431] text-xl">
-            iMessage test
+            iMessage channel
           </h2>
           <p className="text-[#667085] text-sm leading-6">
-            Add your number, send a test DM, then check Messages for the Synk
-            agent.
+            Check the Spectrum project and show the sender only when Spectrum
+            exposes a dedicated iMessage number.
           </p>
         </div>
         <span className="rounded-md bg-[#eef4ff] px-2 py-1 font-medium text-[#2457ff] text-xs">
@@ -666,7 +668,7 @@ function IMessageSetupPanel({
           className="font-medium text-[#4a5160] text-sm"
           htmlFor="imessage-recipient-phone"
         >
-          Your number
+          Your number (optional)
         </label>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <input
@@ -681,9 +683,9 @@ function IMessageSetupPanel({
             value={recipientPhone}
           />
           <GradientButton
-            aria-label="Send Spectrum iMessage test"
+            aria-label="Check Spectrum iMessage channel"
             className="h-11 rounded-xl px-4 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={isLoading || recipientPhone.trim().length === 0}
+            disabled={isLoading}
             onClick={() => {
               void onSendTest();
             }}
@@ -692,7 +694,7 @@ function IMessageSetupPanel({
           >
             <PaperAirplaneIcon aria-hidden="true" className="size-4 text-white" />
             <span className="font-semibold text-sm text-white">
-              {isLoading ? "Sending" : "Send test"}
+              {isLoading ? "Checking" : "Check channel"}
             </span>
           </GradientButton>
         </div>
@@ -712,8 +714,9 @@ function IMessageSetupPanel({
 
       {state.status === "success" ? (
         <p className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-3 text-[#166534] text-sm leading-6">
-          Test sent to {state.result.recipientPhone}. The sender shown in your
-          Messages app is the agent number for this channel.
+          {state.result.mode === "dedicated" && state.result.agentPhone
+            ? `Spectrum channel checked. Dedicated sender: ${state.result.agentPhone}.`
+            : "Spectrum channel checked. This project is shared mode, so no dedicated sender number is exposed."}
         </p>
       ) : null}
 
@@ -756,14 +759,25 @@ function AgentWorkspace({
   async function handleIMessageTestSubmit(): Promise<void> {
     const normalizedPhone = normalizePhoneInput({ value: recipientPhone });
 
-    if (normalizedPhone.length === 0 || isIMessageTestLoading) {
+    if (isIMessageTestLoading) {
+      return;
+    }
+
+    if (
+      normalizedPhone.length > 0 &&
+      !isE164PhoneNumber({ value: normalizedPhone })
+    ) {
+      setIMessageTestState({
+        status: "error",
+        message: "Enter a phone number in E.164 format, for example +233XXXXXXXXX.",
+      });
       return;
     }
 
     setIMessageTestState({ status: "loading" });
 
     const response = await postIMessageTest({
-      recipientPhone: normalizedPhone,
+      recipientPhone: normalizedPhone.length > 0 ? normalizedPhone : null,
     });
 
     if (errore.isError(response)) {
@@ -782,7 +796,10 @@ function AgentWorkspace({
       return;
     }
 
-    setRecipientPhone(response.result.recipientPhone);
+    if (response.result.recipientPhone !== null) {
+      setRecipientPhone(response.result.recipientPhone);
+    }
+
     setIMessageTestState({
       status: "success",
       result: response.result,
@@ -873,10 +890,10 @@ function PastRuns({
 }): ReactElement {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="font-semibold text-2xl text-[#202431]">Past Runs</h2>
+      <h2 className="font-semibold text-2xl text-[#202431]">Saved Runs</h2>
       {runs.length === 0 ? (
         <div className="rounded-xl border border-[#e1e4ea] bg-[#f8f9fb] p-4 text-[#667085] text-sm">
-          Runs appear here after the first repository scan.
+          Repository scans are saved locally in this browser.
         </div>
       ) : (
         <div className="flex max-h-[22rem] flex-col gap-2 overflow-y-auto pr-2">
@@ -1362,7 +1379,7 @@ async function postScan({
 async function postIMessageTest({
   recipientPhone,
 }: {
-  recipientPhone: string;
+  recipientPhone: string | null;
 }): Promise<
   | ClientFetchError
   | ClientResponseParseError
@@ -1425,6 +1442,10 @@ async function postIMessageTest({
 
 function normalizePhoneInput({ value }: { value: string }): string {
   return value.replace(/[^\d+]/g, "");
+}
+
+function isE164PhoneNumber({ value }: { value: string }): boolean {
+  return /^\+[1-9]\d{7,14}$/.test(value);
 }
 
 function ScanResultPanel({ scanState }: { scanState: ScanViewState }): ReactElement {
@@ -1895,8 +1916,8 @@ function isIMessageTestResult(value: unknown): value is IMessageTestResult {
   return (
     (value.agentPhone === null || typeof value.agentPhone === "string") &&
     (value.mode === "dedicated" || value.mode === "shared_or_unknown") &&
-    typeof value.recipientPhone === "string" &&
-    value.status === "sent"
+    (value.recipientPhone === null || typeof value.recipientPhone === "string") &&
+    value.status === "ready"
   );
 }
 
