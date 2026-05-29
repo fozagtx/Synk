@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Synk internal system design</title>
+  <desc id="desc">A whiteboard style internal architecture diagram for Synk showing the UI, scan agent, Bright Data evidence collection, AI normalization, optional Cognee memory, Advisor, reports, and Render deployment boundary.</desc>
+  <defs>
+    <filter id="paper-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#121826" flood-opacity="0.10" />
+    </filter>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M2 2 L12 7 L2 12" fill="none" stroke="#1f2937" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+    <style>
+      .paper { fill: #fbfbf7; }
+      .title { fill: #111827; font: 700 42px "Bradley Hand", "Comic Sans MS", ui-rounded, cursive; letter-spacing: 0; }
+      .subtitle { fill: #4b5563; font: 400 21px "Bradley Hand", "Comic Sans MS", ui-rounded, cursive; letter-spacing: 0; }
+      .label { fill: #111827; font: 700 25px "Bradley Hand", "Comic Sans MS", ui-rounded, cursive; letter-spacing: 0; }
+      .small { fill: #374151; font: 400 18px "Bradley Hand", "Comic Sans MS", ui-rounded, cursive; letter-spacing: 0; }
+      .tiny { fill: #4b5563; font: 400 15px "Bradley Hand", "Comic Sans MS", ui-rounded, cursive; letter-spacing: 0; }
+      .box { fill: #ffffff; stroke: #1f2937; stroke-width: 3; filter: url(#paper-shadow); }
+      .soft { fill: #f7f9ff; stroke: #2457ff; stroke-width: 3; filter: url(#paper-shadow); }
+      .memory { fill: #f7fff7; stroke: #15803d; stroke-width: 3; filter: url(#paper-shadow); }
+      .warn { fill: #fff7ed; stroke: #c2410c; stroke-width: 3; filter: url(#paper-shadow); }
+      .line { fill: none; stroke: #1f2937; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #6b7280; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 9 9; marker-end: url(#arrow); }
+      .boundary { fill: none; stroke: #9ca3af; stroke-width: 3; stroke-dasharray: 12 12; }
+      .dot { fill: #2457ff; }
+      .green-dot { fill: #16a34a; }
+      .orange-dot { fill: #f97316; }
+    </style>
+  </defs>
+
+  <rect class="paper" x="0" y="0" width="1600" height="900" rx="36" />
+  <path d="M44 70 C270 42 474 49 696 62 C936 76 1165 49 1514 67" fill="none" stroke="#e5e7eb" stroke-width="4" stroke-linecap="round" />
+  <text class="title" x="70" y="85">Synk internal system design</text>
+  <text class="subtitle" x="72" y="122">Repository intelligence in, decision-ready fixes and advisor reports out.</text>
+
+  <rect class="boundary" x="52" y="155" width="1496" height="675" rx="32" />
+  <text class="tiny" x="84" y="184">Next.js app on Render: one public web service. Memory is optional through COGNEE_SERVICE_URL.</text>
+
+  <g transform="translate(78 225)">
+    <path class="box" d="M0 18 C4 0 242 0 250 17 C263 52 261 154 246 180 C206 194 34 192 10 179 C-7 143 -6 54 0 18 Z" />
+    <text class="label" x="28" y="50">Operator</text>
+    <circle class="dot" cx="31" cy="84" r="6" />
+    <text class="small" x="48" y="91">paste GitHub URL</text>
+    <circle class="dot" cx="31" cy="120" r="6" />
+    <text class="small" x="48" y="127">or speak request</text>
+    <circle class="dot" cx="31" cy="156" r="6" />
+    <text class="small" x="48" y="163">review fixes</text>
+  </g>
+
+  <g transform="translate(405 205)">
+    <path class="soft" d="M8 15 C36 -5 322 -1 350 20 C368 58 367 184 347 221 C309 246 36 245 9 221 C-8 179 -6 57 8 15 Z" />
+    <text class="label" x="34" y="50">Synk UI</text>
+    <text class="small" x="34" y="84">Agent panel</text>
+    <text class="small" x="34" y="114">Fixes panel</text>
+    <text class="small" x="34" y="144">Advisor chat</text>
+    <text class="small" x="34" y="174">Reports bookmarks</text>
+    <path d="M246 36 C290 50 316 88 315 133 C313 184 281 211 237 220" fill="none" stroke="#2457ff" stroke-width="2.5" stroke-linecap="round" />
+    <text class="tiny" x="205" y="83">localStorage</text>
+    <text class="tiny" x="205" y="108">saved runs</text>
+    <text class="tiny" x="205" y="133">reports</text>
+  </g>
+
+  <g transform="translate(478 505)">
+    <path class="box" d="M7 18 C20 0 297 0 318 17 C334 48 333 131 319 159 C284 182 33 181 7 160 C-6 126 -6 52 7 18 Z" />
+    <text class="label" x="32" y="50">Voice route</text>
+    <text class="small" x="32" y="86">/api/transcribe</text>
+    <text class="small" x="32" y="122">Speechmatics batch ASR</text>
+  </g>
+
+  <g transform="translate(835 205)">
+    <path class="soft" d="M7 21 C24 -1 351 -2 376 19 C394 64 391 215 374 256 C324 280 42 280 8 257 C-8 209 -8 66 7 21 Z" />
+    <text class="label" x="36" y="52">Scan agent</text>
+    <text class="small" x="36" y="88">/api/scan</text>
+    <circle class="dot" cx="39" cy="121" r="6" />
+    <text class="small" x="56" y="128">read repo manifests</text>
+    <circle class="dot" cx="39" cy="156" r="6" />
+    <text class="small" x="56" y="163">extract package stack</text>
+    <circle class="dot" cx="39" cy="191" r="6" />
+    <text class="small" x="56" y="198">plan public evidence searches</text>
+    <circle class="dot" cx="39" cy="226" r="6" />
+    <text class="small" x="56" y="233">sort risks by impact</text>
+  </g>
+
+  <g transform="translate(1280 175)">
+    <path class="warn" d="M8 19 C36 -3 260 0 286 17 C302 55 301 176 287 208 C250 230 43 230 8 210 C-7 170 -7 55 8 19 Z" />
+    <text class="label" x="30" y="52">External web</text>
+    <text class="small" x="30" y="88">GitHub repository files</text>
+    <text class="small" x="30" y="122">Bright Data SERP</text>
+    <text class="small" x="30" y="156">Bright Data Web Unlocker</text>
+    <text class="small" x="30" y="190">CVE, advisory, release pages</text>
+  </g>
+
+  <g transform="translate(1268 472)">
+    <path class="box" d="M10 20 C32 -2 272 0 295 19 C312 56 310 144 295 176 C256 198 45 199 10 178 C-7 140 -7 57 10 20 Z" />
+    <text class="label" x="34" y="52">AI normalizer</text>
+    <text class="small" x="34" y="88">Vercel AI SDK</text>
+    <text class="small" x="34" y="122">AI/ML API model</text>
+    <text class="small" x="34" y="156">strict finding JSON</text>
+  </g>
+
+  <g transform="translate(840 548)">
+    <path class="memory" d="M7 19 C31 -2 330 0 360 21 C378 62 374 186 360 222 C316 246 42 246 8 223 C-8 180 -8 62 7 19 Z" />
+    <text class="label" x="36" y="52">Memory layer</text>
+    <text class="small" x="36" y="88">optional Cognee REST service</text>
+    <text class="small" x="36" y="122">remember completed scans</text>
+    <text class="small" x="36" y="156">dataset: synk-memory</text>
+    <text class="tiny" x="36" y="193">If COGNEE_SERVICE_URL is absent,</text>
+    <text class="tiny" x="36" y="216">Synk still runs with browser history.</text>
+  </g>
+
+  <g transform="translate(405 690)">
+    <path class="box" d="M8 18 C34 -2 352 0 382 19 C399 58 397 151 383 183 C334 207 41 207 9 184 C-8 146 -7 56 8 18 Z" />
+    <text class="label" x="34" y="52">Advisor and reports</text>
+    <text class="small" x="34" y="88">/api/advisor/chat</text>
+    <text class="small" x="34" y="122">/api/advisor/report</text>
+    <text class="small" x="34" y="156">downloadable markdown for dev teams</text>
+  </g>
+
+  <g transform="translate(82 602)">
+    <path class="box" d="M7 19 C31 -2 263 0 291 19 C307 57 306 151 291 183 C253 206 42 207 8 184 C-8 145 -7 56 7 19 Z" />
+    <text class="label" x="32" y="52">Outputs</text>
+    <text class="small" x="32" y="88">ranked risks</text>
+    <text class="small" x="32" y="122">paste-ready fix prompts</text>
+    <text class="small" x="32" y="156">saved run history</text>
+  </g>
+
+  <path class="line" d="M328 320 C358 318 373 318 405 318" />
+  <path class="line" d="M570 430 C571 468 578 485 612 505" />
+  <path class="line" d="M755 322 C790 318 805 318 835 318" />
+  <path class="line" d="M1211 300 C1240 269 1250 260 1280 255" />
+  <path class="line" d="M1212 384 C1242 438 1242 496 1268 548" />
+  <path class="line" d="M1268 568 C1239 549 1226 546 1200 552" />
+  <path class="dash" d="M1020 462 C1022 500 1024 521 1028 548" />
+  <path class="line" d="M840 668 C810 709 798 737 787 758" />
+  <path class="line" d="M405 777 C376 742 361 718 373 692" />
+  <path class="line" d="M405 690 C362 662 336 655 373 641" />
+  <path class="line" d="M252 602 C284 552 341 512 478 565" />
+
+  <g transform="translate(1010 805)">
+    <circle class="green-dot" cx="0" cy="0" r="7" />
+    <text class="tiny" x="18" y="6">Memory writes are non-blocking: scan response survives Cognee failure.</text>
+  </g>
+  <g transform="translate(1010 835)">
+    <circle class="orange-dot" cx="0" cy="0" r="7" />
+    <text class="tiny" x="18" y="6">Render deployment runs Synk web service; external provider keys live in Render env vars.</text>
+  </g>
+</svg>

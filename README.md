@@ -1,6 +1,6 @@
 # Synk
 
-![Handwritten Synk system design](public/synk-system-design.png)
+![Synk internal system design](public/synk-system-design.svg)
 
 Synk scans a GitHub repository, reads dependency and stack evidence, checks public threat, release, and deprecation signals, then turns the result into action-ready fixes a developer can paste into an IDE.
 
