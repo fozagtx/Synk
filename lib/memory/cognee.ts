@@ -16,13 +16,19 @@ class CogneeFetchError extends errore.createTaggedError({
 
 class CogneeResponseError extends errore.createTaggedError({
   name: "CogneeResponseError",
-  message: "$operation returned HTTP $status for $url: $body",
+  message: "$operation returned HTTP $status for $url: $bodySummary",
 }) {}
 
 type CogneeError =
   | CogneeConfigurationError
   | CogneeFetchError
   | CogneeResponseError;
+
+const COGNEE_REMEMBER_TIMEOUT_MS: number = 30_000;
+const COGNEE_WAKE_ATTEMPTS: number = 6;
+const COGNEE_WAKE_TIMEOUT_MS: number = 10_000;
+const COGNEE_WAKE_DELAY_MS: number = 2_000;
+const COGNEE_RESPONSE_BODY_LIMIT: number = 600;
 
 interface CogneeConfig {
   apiKey: string | null;
@@ -130,6 +136,20 @@ async function postCogneeRememberEntry({
     entry: buildQAEntry({ report }),
     session_id: report.scanId,
   };
+  const wakeResult = await waitForCogneeService({
+    attempt: 1,
+    config,
+  });
+
+  if (errore.isError(wakeResult)) {
+    console.warn("Cognee memory service wake failed", {
+      error: wakeResult.message,
+      scanId: report.scanId,
+    });
+
+    return wakeResult;
+  }
+
   const firstAttempt = await postCogneeJsonOnce({
     body,
     config,
@@ -178,12 +198,135 @@ async function postCogneeJsonOnce({
   operation: string;
   url: string;
 }): Promise<CogneeFetchError | CogneeResponseError | CogneeRememberResponse> {
+  const response = await requestCognee({
+    body: JSON.stringify(body),
+    config,
+    method: "POST",
+    operation,
+    timeoutMs: COGNEE_REMEMBER_TIMEOUT_MS,
+    url,
+  });
+
+  if (errore.isError(response)) {
+    return response;
+  }
+
+  const bodyText = await readCogneeResponseText({
+    operation,
+    response,
+    url,
+  });
+
+  if (errore.isError(bodyText)) {
+    return bodyText;
+  }
+
+  if (!response.ok) {
+    return new CogneeResponseError({
+      bodySummary: summarizeCogneeResponseBody({ bodyText }),
+      operation,
+      status: response.status,
+      url,
+    });
+  }
+
+  return {
+    entryId: parseRememberEntryId({ bodyText }),
+  };
+}
+
+async function waitForCogneeService({
+  attempt,
+  config,
+}: {
+  attempt: number;
+  config: CogneeConfig;
+}): Promise<CogneeError | null> {
+  const url: string = new URL("/", config.serviceUrl).toString();
+  const operation: string = "Cognee memory service wake";
+  const response = await requestCognee({
+    body: null,
+    config,
+    method: "GET",
+    operation,
+    timeoutMs: COGNEE_WAKE_TIMEOUT_MS,
+    url,
+  });
+
+  if (errore.isError(response)) {
+    if (attempt >= COGNEE_WAKE_ATTEMPTS) {
+      return response;
+    }
+
+    await delay({ milliseconds: COGNEE_WAKE_DELAY_MS });
+
+    return waitForCogneeService({
+      attempt: attempt + 1,
+      config,
+    });
+  }
+
+  if (response.ok) {
+    return null;
+  }
+
+  const bodyText = await readCogneeResponseText({
+    operation,
+    response,
+    url,
+  });
+
+  if (errore.isError(bodyText)) {
+    return bodyText;
+  }
+
+  const responseError = new CogneeResponseError({
+    bodySummary: summarizeCogneeResponseBody({ bodyText }),
+    operation,
+    status: response.status,
+    url,
+  });
+
+  if (attempt >= COGNEE_WAKE_ATTEMPTS) {
+    return responseError;
+  }
+
+  await delay({ milliseconds: COGNEE_WAKE_DELAY_MS });
+
+  return waitForCogneeService({
+    attempt: attempt + 1,
+    config,
+  });
+}
+
+async function requestCognee({
+  body,
+  config,
+  method,
+  operation,
+  timeoutMs,
+  url,
+}: {
+  body: string | null;
+  config: CogneeConfig;
+  method: "GET" | "POST";
+  operation: string;
+  timeoutMs: number;
+  url: string;
+}): Promise<CogneeFetchError | Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(
+      new Error(`${operation} timed out after ${timeoutMs.toString()}ms`)
+    );
+  }, timeoutMs);
   const response = await errore.tryAsync({
     try: () => {
       return fetch(url, {
-        method: "POST",
+        method,
         headers: buildCogneeHeaders({ config }),
-        body: JSON.stringify(body),
+        body,
+        signal: controller.signal,
       });
     },
     catch: (cause) => {
@@ -195,24 +338,60 @@ async function postCogneeJsonOnce({
     },
   });
 
-  if (errore.isError(response)) {
-    return response;
+  clearTimeout(timeout);
+
+  return response;
+}
+
+async function readCogneeResponseText({
+  operation,
+  response,
+  url,
+}: {
+  operation: string;
+  response: Response;
+  url: string;
+}): Promise<CogneeFetchError | string> {
+  return errore.tryAsync({
+    try: () => {
+      return response.text();
+    },
+    catch: (cause) => {
+      return new CogneeFetchError({
+        operation,
+        url,
+        cause,
+      });
+    },
+  });
+}
+
+async function delay({
+  milliseconds,
+}: {
+  milliseconds: number;
+}): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function summarizeCogneeResponseBody({ bodyText }: { bodyText: string }): string {
+  const compactBody: string = bodyText.replace(/\s+/g, " ").trim();
+
+  if (compactBody.length === 0) {
+    return "empty response body";
   }
 
-  const bodyText = await response.text();
-
-  if (!response.ok) {
-    return new CogneeResponseError({
-      operation,
-      url,
-      status: response.status,
-      body: bodyText,
-    });
+  if (/<!doctype html|<html/i.test(compactBody)) {
+    return `HTML error page from upstream service (${bodyText.length.toString()} chars)`;
   }
 
-  return {
-    entryId: parseRememberEntryId({ bodyText }),
-  };
+  if (compactBody.length > COGNEE_RESPONSE_BODY_LIMIT) {
+    return `${compactBody.slice(0, COGNEE_RESPONSE_BODY_LIMIT)}... (${bodyText.length.toString()} chars total)`;
+  }
+
+  return compactBody;
 }
 
 function buildCogneeHeaders({ config }: { config: CogneeConfig }): Headers {
