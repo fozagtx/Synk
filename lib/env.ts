@@ -71,6 +71,6 @@ export const env: Env = {
   }),
   nebiusModel: readEnvWithDefault({
     name: "NEBIUS_MODEL",
-    value: "meta-llama/Llama-3.3-70B-Instruct",
+    value: "Qwen/Qwen3-30B-A3B-Instruct-2507",
   }),
 };

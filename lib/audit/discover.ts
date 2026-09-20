@@ -12,7 +12,10 @@ import {
 } from "@/lib/audit/html";
 import { isRecord } from "@/lib/audit/errors";
 import type { Builder, SiteContext, SitePage } from "@/lib/audit/types";
-import { scrapeWithFirecrawl } from "@/lib/crawl/firecrawl";
+import {
+  isFirecrawlRateLimited,
+  scrapeWithFirecrawl,
+} from "@/lib/crawl/firecrawl";
 
 const USER_AGENT = "Synk Rescue Audit/1.0 (+https://synk.dev)";
 const REQUEST_TIMEOUT_MS = 9000;
@@ -376,19 +379,36 @@ function sameOriginLinks({
     );
 }
 
-async function scrapeLinkedPage({
-  url,
+async function scrapeLinkedPages({
+  urls,
   apiKey,
 }: {
-  url: URL;
+  urls: URL[];
   apiKey: string;
 }): Promise<void> {
+  const [url, ...remainingUrls] = urls;
+
+  if (url === undefined) {
+    return;
+  }
+
   const result = await scrapeWithFirecrawl({
     url: url.toString(),
     apiKey,
   });
 
   if (result instanceof Error) {
+    if (isFirecrawlRateLimited({ error: result })) {
+      console.warn(
+        JSON.stringify({
+          event: "firecrawl_rate_limited",
+          url: url.toString(),
+          status: 429,
+        }),
+      );
+      return;
+    }
+
     console.warn(
       JSON.stringify({
         event: "firecrawl_subpage_unavailable",
@@ -397,6 +417,11 @@ async function scrapeLinkedPage({
       }),
     );
   }
+
+  await scrapeLinkedPages({
+    urls: remainingUrls,
+    apiKey,
+  });
 }
 
 export async function discoverSite({
@@ -438,12 +463,26 @@ export async function discoverSite({
       ? firecrawlHome.html
       : null;
 
-  if (firecrawlHome instanceof Error) {
+  const homeRateLimited =
+    firecrawlHome instanceof Error &&
+    isFirecrawlRateLimited({ error: firecrawlHome });
+
+  if (firecrawlHome instanceof Error && !homeRateLimited) {
     console.warn(
       JSON.stringify({
         event: "firecrawl_home_unavailable",
         url: resolved.toString(),
         error: firecrawlHome.message,
+      }),
+    );
+  }
+
+  if (homeRateLimited) {
+    console.warn(
+      JSON.stringify({
+        event: "firecrawl_rate_limited",
+        url: resolved.toString(),
+        status: 429,
       }),
     );
   }
@@ -468,15 +507,11 @@ export async function discoverSite({
   );
   const firecrawlApiKey = env.firecrawlApiKey;
 
-  if (firecrawlApiKey !== null) {
-    await Promise.all(
-      uniqueLinks.map((url) =>
-        scrapeLinkedPage({
-          url,
-          apiKey: firecrawlApiKey,
-        }),
-      ),
-    );
+  if (firecrawlApiKey !== null && !homeRateLimited) {
+    await scrapeLinkedPages({
+      urls: uniqueLinks.slice(0, 3),
+      apiKey: firecrawlApiKey,
+    });
   }
   const bundleUrls = [
     ...scriptSources({ html: home.html }),

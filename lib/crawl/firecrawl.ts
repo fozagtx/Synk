@@ -16,6 +16,14 @@ export interface FirecrawlPage {
   statusCode: number | null;
 }
 
+export function isFirecrawlRateLimited({
+  error,
+}: {
+  error: Error;
+}): boolean {
+  return FirecrawlResponseError.is(error) && error.status === 429;
+}
+
 function readPage({
   value,
   url,
@@ -127,6 +135,10 @@ export async function scrapeWithFirecrawl({
   const first = await request({ url, apiKey });
 
   if (!(first instanceof Error)) {
+    return first;
+  }
+
+  if (isFirecrawlRateLimited({ error: first })) {
     return first;
   }
 

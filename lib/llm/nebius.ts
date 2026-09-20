@@ -1,4 +1,4 @@
-import { generateText, Output } from "ai";
+import { APICallError, generateText, Output } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import * as errore from "errore";
 import { z } from "zod";
@@ -23,6 +23,46 @@ const reportProseSchema = z.object({
     }),
   ),
 });
+
+function serializeErrorDetail({ value }: { value: unknown }): string | null {
+  if (value === null || typeof value === "undefined") {
+    return null;
+  }
+
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return String(value);
+}
+
+function errorDetails({ error }: { error: Error }): {
+  cause: string | null;
+  responseBody: string | null;
+} {
+  const responseBody = responseBodyFor({ value: error });
+
+  return {
+    cause: serializeErrorDetail({ value: error.cause }),
+    responseBody,
+  };
+}
+
+function responseBodyFor({ value }: { value: unknown }): string | null {
+  if (APICallError.isInstance(value)) {
+    return value.responseBody ?? null;
+  }
+
+  if (value instanceof Error) {
+    return responseBodyFor({ value: value.cause });
+  }
+
+  return null;
+}
 
 function promptFor({
   findings,
@@ -79,12 +119,23 @@ export async function writeReportProse({
         prompt: promptFor({ findings, scores, builder, resolvedUrl }),
         temperature: 0.2,
         maxRetries: 1,
+        maxOutputTokens: 4000,
       }),
     catch: (cause) =>
       cause instanceof Error ? cause : new Error("Nebius generation failed"),
   });
 
   if (generated instanceof Error) {
+    const details = errorDetails({ error: generated });
+    console.warn(
+      JSON.stringify({
+        event: "nebius_error",
+        model: env.nebiusModel,
+        message: generated.message,
+        cause: details.cause,
+        responseBody: details.responseBody,
+      }),
+    );
     return generated;
   }
 
