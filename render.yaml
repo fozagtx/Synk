@@ -12,7 +12,7 @@ services:
         value: "20"
       - key: SPEECHMATICS_API_KEY
         sync: false
-      - key: SPEECHMATICS_BATCH_BASE_URL
-        value: https://eu1.asr.api.speechmatics.com/v2
-      - key: SPEECHMATICS_REALTIME_URL
-        value: wss://eu.rt.speechmatics.com/v2
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: NEBIUS_API_KEY
+        sync: false

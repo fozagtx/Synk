@@ -1,4 +1,4 @@
-import type { Builder, Finding } from "@/lib/audit/types";
+import type { Builder, Finding, ReportFinding } from "@/lib/audit/types";
 
 function builderInstructions({ builder }: { builder: Builder }): string {
   if (builder === "lovable") {
@@ -44,7 +44,11 @@ function sqlFix({ finding }: { finding: Finding }): string {
   ].join("\n");
 }
 
-function findingFix({ finding }: { finding: Finding }): string {
+function findingFix({
+  finding,
+}: {
+  finding: Finding | ReportFinding;
+}): string {
   if (
     finding.category === "security" &&
     finding.evidence.some((evidence) => evidence.table)
@@ -52,10 +56,14 @@ function findingFix({ finding }: { finding: Finding }): string {
     return sqlFix({ finding });
   }
 
-  return finding.exactFix;
+  return "whatToDo" in finding ? finding.whatToDo : finding.exactFix;
 }
 
-function formatItem({ finding }: { finding: Finding }): string {
+function formatItem({
+  finding,
+}: {
+  finding: Finding | ReportFinding;
+}): string {
   const evidence = finding.evidence
     .map((item) => {
       const status = item.status ?? "unavailable";
@@ -82,13 +90,19 @@ function severityRank({ severity }: { severity: Finding["severity"] }): number {
   }[severity];
 }
 
-function isSafeFinding({ finding }: { finding: Finding }): boolean {
+function isSafeFinding({
+  finding,
+}: {
+  finding: Finding | ReportFinding;
+}): boolean {
   if (!["security", "seo", "hygiene"].includes(finding.category)) {
     return false;
   }
 
   return !/image|h1|root|layout|design|visible|ui/i.test(
-    `${finding.title} ${finding.exactFix}`,
+    `${finding.title} ${
+      "whatToDo" in finding ? finding.whatToDo : finding.exactFix
+    }`,
   );
 }
 
@@ -98,7 +112,7 @@ export function buildFixPrompts({
   resolvedUrl,
   projectRef,
 }: {
-  findings: Finding[];
+  findings: Array<Finding | ReportFinding>;
   builder: Builder;
   resolvedUrl: string;
   projectRef: string | null;
@@ -119,7 +133,7 @@ export function buildFixPrompts({
   const safeFindings = ordered.filter((finding) =>
     isSafeFinding({ finding }),
   );
-  const format = (selected: Finding[]): string => {
+  const format = (selected: Array<Finding | ReportFinding>): string => {
     const items = selected
       .map((finding, index) => {
         return `${index + 1}. ${formatItem({ finding })}`;

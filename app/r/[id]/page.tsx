@@ -147,28 +147,42 @@ function isCategoryScore(value: unknown): value is number | null {
 }
 
 function readScores({ value }: { value: unknown }): Scores | null {
+  const scoreKeys: Array<keyof Scores> = [
+    "deploy",
+    "seo",
+    "perf",
+    "security",
+    "hygiene",
+  ];
+
   if (
     !isRecord(value) ||
-    !isCategoryScore(value.deploy) ||
-    !isCategoryScore(value.seo) ||
-    !isCategoryScore(value.perf) ||
-    !isCategoryScore(value.security) ||
-    !isCategoryScore(value.hygiene) ||
     typeof value.overall !== "number" ||
     typeof value.launchBlocked !== "boolean"
   ) {
     return null;
   }
+  const validScores = scoreKeys.every((key) => {
+    return isCategoryScore(value[key]);
+  });
+
+  if (!validScores) {
+    return null;
+  }
 
   return {
-    deploy: value.deploy,
-    seo: value.seo,
-    perf: value.perf,
-    security: value.security,
-    hygiene: value.hygiene,
+    deploy: readNullableScore({ value: value.deploy }),
+    seo: readNullableScore({ value: value.seo }),
+    perf: readNullableScore({ value: value.perf }),
+    security: readNullableScore({ value: value.security }),
+    hygiene: readNullableScore({ value: value.hygiene }),
     overall: value.overall,
     launchBlocked: value.launchBlocked,
   };
+}
+
+function readNullableScore({ value }: { value: unknown }): number | null {
+  return value === null ? null : typeof value === "number" ? value : null;
 }
 
 function readReport({ value }: { value: unknown }): AuditReport | null {
@@ -180,7 +194,9 @@ function readReport({ value }: { value: unknown }): AuditReport | null {
     !Array.isArray(value.findings) ||
     !Array.isArray(value.prioritizedFixes) ||
     typeof value.fixPrompt !== "string" ||
-    typeof value.safeFixPrompt !== "string"
+    typeof value.safeFixPrompt !== "string" ||
+    (value.proseSource !== "nebius" && value.proseSource !== "deterministic") ||
+    (value.crawlSource !== "firecrawl" && value.crawlSource !== "fetch")
   ) {
     return null;
   }
@@ -207,6 +223,8 @@ function readReport({ value }: { value: unknown }): AuditReport | null {
     prioritizedFixes,
     fixPrompt: value.fixPrompt,
     safeFixPrompt: value.safeFixPrompt,
+    proseSource: value.proseSource,
+    crawlSource: value.crawlSource,
   };
 }
 
@@ -461,6 +479,11 @@ export default function ReportPage() {
           <p className="mt-5 max-w-2xl text-lg text-ink-muted">
             {report.verdict}
           </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-caption-muted">
+            {report.proseSource === "nebius"
+              ? "Written by AI (Nebius)"
+              : "Deterministic report"}
+          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button
               onClick={() => void copyPrompt({ safe: false })}
@@ -500,7 +523,7 @@ export default function ReportPage() {
               {report.scores[key] === null ? (
                 <>
                   <p className="mt-2 font-display text-3xl font-bold text-ink">
-                    —
+                    n/a
                   </p>
                   <p className="text-xs text-caption-muted">not checked</p>
                 </>

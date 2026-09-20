@@ -166,7 +166,7 @@ export default function HomePage() {
             Rescue your vibe-coded app before launch.
           </h1>
           <p className="mt-8 max-w-2xl font-display text-xl font-light leading-8 text-white/75 md:text-[22px]">
-            A deterministic audit that finds the issues your builder could not —
+            A deterministic audit that finds the issues your builder could not:
             from exposed Supabase tables to broken SEO and slow pages.
           </p>
           <div className="mt-12 w-full max-w-2xl rounded-xl border border-hairline-cool bg-white p-2 text-left">

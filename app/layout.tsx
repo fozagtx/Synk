@@ -6,7 +6,7 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Synk — Vibe-Code Rescue Audit",
+  title: "Synk: Vibe-Code Rescue Audit",
   description: "Find the hidden launch blockers in your Lovable, Bolt, v0, or Cursor app.",
   icons: { icon: "/icon.svg" },
 };

@@ -1,7 +1,7 @@
 export interface Env {
   speechmaticsApiKey: string | null;
-  speechmaticsBatchBaseUrl: string;
-  speechmaticsRealtimeUrl: string;
+  firecrawlApiKey: string | null;
+  nebiusApiKey: string | null;
 }
 
 export interface EnvRequirement {
@@ -25,16 +25,6 @@ export function readOptionalEnv({ name }: { name: string }): string | null {
   return trimmedValue;
 }
 
-export function readEnvWithDefault({
-  name,
-  value,
-}: {
-  name: string;
-  value: string;
-}): string {
-  return readOptionalEnv({ name }) ?? value;
-}
-
 export function getMissingEnvNames({
   requirements,
 }: {
@@ -51,12 +41,6 @@ export function getMissingEnvNames({
 
 export const env: Env = {
   speechmaticsApiKey: readOptionalEnv({ name: "SPEECHMATICS_API_KEY" }),
-  speechmaticsBatchBaseUrl: readEnvWithDefault({
-    name: "SPEECHMATICS_BATCH_BASE_URL",
-    value: "https://eu1.asr.api.speechmatics.com/v2",
-  }),
-  speechmaticsRealtimeUrl: readEnvWithDefault({
-    name: "SPEECHMATICS_REALTIME_URL",
-    value: "wss://eu.rt.speechmatics.com/v2",
-  }),
+  firecrawlApiKey: readOptionalEnv({ name: "FIRECRAWL_API_KEY" }),
+  nebiusApiKey: readOptionalEnv({ name: "NEBIUS_API_KEY" }),
 };

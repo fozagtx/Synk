@@ -2,6 +2,7 @@ import dns from "node:dns/promises";
 
 import * as errore from "errore";
 
+import { env } from "@/lib/env";
 import {
   hasEmptyRoot,
   htmlLinks,
@@ -11,6 +12,10 @@ import {
 } from "@/lib/audit/html";
 import { isRecord } from "@/lib/audit/errors";
 import type { Builder, SiteContext, SitePage } from "@/lib/audit/types";
+import {
+  isFirecrawlRateLimited,
+  scrapeWithFirecrawl,
+} from "@/lib/crawl/firecrawl";
 
 const USER_AGENT = "Synk Rescue Audit/1.0 (+https://synk.dev)";
 const REQUEST_TIMEOUT_MS = 9000;
@@ -353,6 +358,72 @@ function extractSupabase({
   };
 }
 
+function sameOriginLinks({
+  hrefs,
+  resolved,
+}: {
+  hrefs: string[];
+  resolved: URL;
+}): URL[] {
+  return hrefs
+    .map((href) =>
+      errore.try({
+        try: () => new URL(href, resolved),
+        catch: () => new Error("Invalid linked URL"),
+      }),
+    )
+    .filter((url): url is URL => url instanceof URL)
+    .filter(
+      (url) =>
+        url.origin === resolved.origin && url.pathname !== resolved.pathname,
+    );
+}
+
+async function scrapeLinkedPages({
+  urls,
+  apiKey,
+}: {
+  urls: URL[];
+  apiKey: string;
+}): Promise<void> {
+  const [url, ...remainingUrls] = urls;
+
+  if (url === undefined) {
+    return;
+  }
+
+  const result = await scrapeWithFirecrawl({
+    url: url.toString(),
+    apiKey,
+  });
+
+  if (result instanceof Error) {
+    if (isFirecrawlRateLimited({ error: result })) {
+      console.warn(
+        JSON.stringify({
+          event: "firecrawl_rate_limited",
+          url: url.toString(),
+          status: 429,
+        }),
+      );
+      return;
+    }
+
+    console.warn(
+      JSON.stringify({
+        event: "firecrawl_subpage_unavailable",
+        url: url.toString(),
+        error: result.message,
+      }),
+    );
+  }
+
+  await scrapeLinkedPages({
+    urls: remainingUrls,
+    apiKey,
+  });
+}
+
 export async function discoverSite({
   inputUrl,
 }: {
@@ -381,13 +452,50 @@ export async function discoverSite({
 
   const resolved = new URL(home.url);
   const origin = resolved.origin;
-  const links = htmlLinks({ html: home.html })
-    .map((href) => errore.try({
-      try: () => new URL(href, resolved),
-      catch: () => new Error("Invalid linked URL"),
-    }))
-    .filter((url): url is URL => url instanceof URL)
-    .filter((url) => url.origin === origin && url.pathname !== resolved.pathname);
+  const firecrawlHome = env.firecrawlApiKey
+    ? await scrapeWithFirecrawl({
+        url: resolved.toString(),
+        apiKey: env.firecrawlApiKey,
+      })
+    : null;
+  const renderedHtml =
+    firecrawlHome !== null && !(firecrawlHome instanceof Error)
+      ? firecrawlHome.html
+      : null;
+
+  const homeRateLimited =
+    firecrawlHome instanceof Error &&
+    isFirecrawlRateLimited({ error: firecrawlHome });
+
+  if (firecrawlHome instanceof Error && !homeRateLimited) {
+    console.warn(
+      JSON.stringify({
+        event: "firecrawl_home_unavailable",
+        url: resolved.toString(),
+        error: firecrawlHome.message,
+      }),
+    );
+  }
+
+  if (homeRateLimited) {
+    console.warn(
+      JSON.stringify({
+        event: "firecrawl_rate_limited",
+        url: resolved.toString(),
+        status: 429,
+      }),
+    );
+  }
+
+  const links = sameOriginLinks({
+    hrefs: [
+      ...htmlLinks({ html: home.html }),
+      ...(firecrawlHome !== null && !(firecrawlHome instanceof Error)
+        ? firecrawlHome.links
+        : []),
+    ],
+    resolved,
+  });
   const uniqueLinks = [
     ...new Map(links.map((url) => [url.pathname, url])).values(),
   ].slice(0, 10);
@@ -397,6 +505,14 @@ export async function discoverSite({
       return page instanceof Error ? null : page;
     }),
   );
+  const firecrawlApiKey = env.firecrawlApiKey;
+
+  if (firecrawlApiKey !== null && !homeRateLimited) {
+    await scrapeLinkedPages({
+      urls: uniqueLinks.slice(0, 3),
+      apiKey: firecrawlApiKey,
+    });
+  }
   const bundleUrls = [
     ...scriptSources({ html: home.html }),
     ...modulePreloadSources({ html: home.html }),
@@ -434,6 +550,8 @@ export async function discoverSite({
     origin,
     status: home.status,
     html: home.html,
+    renderedHtml,
+    crawlSource: renderedHtml === null ? "fetch" : "firecrawl",
     headers: home.headers,
     pages: pages.filter((page): page is SitePage => page !== null),
     robots: robots instanceof Error ? null : robots.html,

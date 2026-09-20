@@ -62,14 +62,14 @@ import * as errore from "errore";
 
 ## Secrets And Environment
 
-- This project uses Doppler to manage secrets with one project and three environments: `dev`, `preview`, and `production`.
-- The `dev` environment is already selected and implicit in Doppler calls.
 - Do not read secrets with `process.env` directly in TypeScript.
-- Find the closest `env.ts` file that exports a typed `env` object and use that.
-- If no `env.ts` exists near the code that needs secrets, create one before using secrets.
-- The `env.ts` file is the visible list of which secrets exist and which need to be added.
-- Do not run mutating Doppler commands.
-- For tests or scripts that already wrap Doppler, use the package script rather than invoking Doppler directly.
+- Use the typed `env` object exported by `lib/env.ts` for configuration and secrets.
+- The supported environment variables are `SPEECHMATICS_API_KEY`,
+  `FIRECRAWL_API_KEY`, and `NEBIUS_API_KEY`.
+- Non-secret provider URLs and the Nebius model are defined in
+  `lib/config.ts`.
+- Render configuration lives in `render.yaml`; keep its
+  `sync: false` secret settings aligned with `lib/env.ts`.
 
 ## Long Strings
 
@@ -302,16 +302,11 @@ curl -fs https://tailwindcss.com/docs/upgrade-guide
 - For AI chat or interactive flows, prefer client-held resume state when model support allows it.
 - For background jobs or fixed retry bodies, use server-held task state.
 
-## Vercel CLI
+## Render deployment
 
-- Use the Vercel CLI to list deployments, inspect build status, and stream runtime logs.
-- List deployments with `vercel list`, `vercel list --prod`, or `vercel list --limit 5`.
-- Inspect deployments with `vercel inspect <deployment-url-or-id>`.
-- Inspect build logs with `vercel inspect <deployment-url-or-id> --logs --wait`.
-- Runtime logs stream only new logs from command start; they do not fetch historical logs.
-- Use `vercel logs <deployment-url-or-id> --json` for structured runtime log streaming.
-- The deprecated `--since`, `--limit`, and `--follow` runtime log options are ignored.
-- Use `tmux` for background log streaming when needed.
+- Render deployment configuration lives in `render.yaml`.
+- Keep the web service build command, start command, health check, and
+  environment variables aligned with that file.
 
 ## Three.js
 

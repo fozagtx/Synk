@@ -1,9 +1,11 @@
 import { discoverSite } from "@/lib/audit/discover";
 import { buildFixPrompts } from "@/lib/audit/fix-prompt";
-import { buildReport } from "@/lib/audit/report";
+import { buildReport, overlayReportProse } from "@/lib/audit/report";
 import { checks } from "@/lib/audit/registry";
 import { scoreFindings } from "@/lib/audit/score";
 import { getAudit, updateAudit } from "@/lib/audit/store";
+import { env } from "@/lib/env";
+import { writeReportProse } from "@/lib/llm/nebius";
 import type {
   Audit,
   AuditStep,
@@ -25,6 +27,15 @@ export const auditSteps: AuditStep[] = [
     label: checkLabel({ id: check.id }),
     state: "pending" as const,
   })),
+  ...(env.nebiusApiKey === null
+    ? []
+    : [
+        {
+          id: "writing-report",
+          label: "writing your report",
+          state: "pending" as const,
+        },
+      ]),
 ];
 
 function updateStep({
@@ -124,34 +135,53 @@ function checkLabel({ id }: { id: string }): string {
   );
 }
 
-function completeAudit({
+async function completeAudit({
   audit,
   findings,
   builder,
   resolvedUrl,
   projectRef,
+  crawlSource,
 }: {
   audit: Audit;
   findings: Finding[];
   builder: Parameters<typeof buildFixPrompts>[0]["builder"];
   resolvedUrl: string;
   projectRef: string | null;
-}): void {
+  crawlSource: "firecrawl" | "fetch";
+}): Promise<void> {
   const scores = scoreFindings({ findings });
-  const prompts = buildFixPrompts({
+  const deterministicReport = buildReport({
     findings,
+    builder,
+    resolvedUrl,
+    scores,
+    fixPrompt: "",
+    safeFixPrompt: "",
+    crawlSource,
+  });
+  const reportWithProse =
+    env.nebiusApiKey === null
+      ? deterministicReport
+      : await writeProse({
+          audit,
+          report: deterministicReport,
+          findings,
+          scores,
+          builder,
+          resolvedUrl,
+        });
+  const prompts = buildFixPrompts({
+    findings: reportWithProse.findings,
     builder,
     resolvedUrl,
     projectRef,
   });
-  const report = buildReport({
-    findings,
-    scores,
-    builder,
-    resolvedUrl,
+  const report = {
+    ...reportWithProse,
     fixPrompt: prompts.full,
     safeFixPrompt: prompts.safe,
-  });
+  };
 
   updateAudit({
     id: audit.id,
@@ -166,6 +196,45 @@ function completeAudit({
       })),
     },
   });
+}
+
+async function writeProse({
+  audit,
+  report,
+  findings,
+  scores,
+  builder,
+  resolvedUrl,
+}: {
+  audit: Audit;
+  report: ReturnType<typeof buildReport>;
+  findings: Finding[];
+  scores: ReturnType<typeof scoreFindings>;
+  builder: Parameters<typeof buildFixPrompts>[0]["builder"];
+  resolvedUrl: string;
+}): Promise<ReturnType<typeof buildReport>> {
+  updateStep({ audit, stepId: "writing-report", state: "running" });
+  const prose = await writeReportProse({
+    findings,
+    scores,
+    builder,
+    resolvedUrl,
+  });
+
+  if (prose instanceof Error) {
+    console.warn(
+      JSON.stringify({
+        event: "nebius_prose_unavailable",
+        auditId: audit.id,
+        error: prose.message,
+      }),
+    );
+    updateStep({ audit, stepId: "writing-report", state: "unavailable" });
+    return report;
+  }
+
+  updateStep({ audit, stepId: "writing-report", state: "done" });
+  return overlayReportProse({ report, prose });
 }
 
 export async function runAudit({ audit }: { audit: Audit }): Promise<void> {
@@ -185,12 +254,13 @@ export async function runAudit({ audit }: { audit: Audit }): Promise<void> {
       updateStep({ audit, stepId: check.id, state: "unavailable" });
       return check.id;
     });
-    completeAudit({
+    await completeAudit({
       audit,
       findings: failed,
       builder: "unknown",
       resolvedUrl: audit.url,
       projectRef: null,
+      crawlSource: "fetch",
     });
     return;
   }
@@ -215,11 +285,12 @@ export async function runAudit({ audit }: { audit: Audit }): Promise<void> {
       return findings;
     }),
   );
-  completeAudit({
+  await completeAudit({
     audit,
     findings: result.flat(),
     builder: context.builder,
     resolvedUrl: context.resolvedUrl,
     projectRef: context.supabaseProjectRef,
+    crawlSource: context.crawlSource,
   });
 }
