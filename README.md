@@ -4,6 +4,16 @@ Synk is a rescue audit for sites built with Lovable, Bolt, v0, or Cursor. You pa
 
 No mocks. Every finding comes from a real HTTP request against the live site, and every finding carries the evidence that produced it.
 
+## Screenshots
+
+Live audit of a Lovable site with Firecrawl crawling and Nebius prose enabled.
+
+![Home page](docs/screenshots/home.png)
+
+![Audit status](docs/screenshots/status.png)
+
+![Report](docs/screenshots/report.png)
+
 ## Contents
 
 - [How it works](#how-it-works)
