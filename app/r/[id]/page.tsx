@@ -142,14 +142,18 @@ function readEffort({
   return "15 min";
 }
 
+function isCategoryScore(value: unknown): value is number | null {
+  return typeof value === "number" || value === null;
+}
+
 function readScores({ value }: { value: unknown }): Scores | null {
   if (
     !isRecord(value) ||
-    typeof value.deploy !== "number" ||
-    typeof value.seo !== "number" ||
-    typeof value.perf !== "number" ||
-    typeof value.security !== "number" ||
-    typeof value.hygiene !== "number" ||
+    !isCategoryScore(value.deploy) ||
+    !isCategoryScore(value.seo) ||
+    !isCategoryScore(value.perf) ||
+    !isCategoryScore(value.security) ||
+    !isCategoryScore(value.hygiene) ||
     typeof value.overall !== "number" ||
     typeof value.launchBlocked !== "boolean"
   ) {
