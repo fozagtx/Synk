@@ -141,3 +141,7 @@ components/          UI
 - Supabase checks are read-only. Synk never inserts, updates, or deletes. At most 25 tables are probed, always with `limit=1`.
 - One site is discovered per audit. Subpage sampling is capped to keep audits under about a minute.
 - Builder detection uses the host, generator metadata, and bundle signatures. Cursor leaves no reliable trace on a deployed site, so Cursor projects get the generic Fix Prompt.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
