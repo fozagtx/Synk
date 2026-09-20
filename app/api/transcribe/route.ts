@@ -3,7 +3,7 @@ import * as errore from "errore";
 import {
   InvalidVoiceRequestError,
   toErrorCode,
-} from "@/lib/scan/errors";
+} from "@/lib/audit/errors";
 import { transcribeWithSpeechmatics } from "@/lib/voice/speechmatics";
 
 export const dynamic = "force-dynamic";

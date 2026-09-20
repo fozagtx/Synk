@@ -8,7 +8,7 @@ import {
   VoiceProviderConfigurationError,
   VoiceTranscriptionTimeoutError,
   isRecord,
-} from "@/lib/scan/errors";
+} from "@/lib/audit/errors";
 
 export interface SpeechmaticsConfig {
   apiKey: string;
