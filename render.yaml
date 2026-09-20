@@ -10,21 +10,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      - key: SERP_API_KEY
-        sync: false
-      - key: WEBUNLOCKER_API_KEY
-        sync: false
-      - key: AIMLAPI_API_KEY
-        sync: false
-      - key: AIMLAPI_BASE_URL
-        value: https://api.aimlapi.com/v1
-      - key: AIMLAPI_MODEL
-        value: gpt-4o
       - key: SPEECHMATICS_API_KEY
         sync: false
       - key: SPEECHMATICS_BATCH_BASE_URL
         value: https://eu1.asr.api.speechmatics.com/v2
       - key: SPEECHMATICS_REALTIME_URL
         value: wss://eu.rt.speechmatics.com/v2
-      - key: COGNEE_DATASET_NAME
-        value: synk-memory

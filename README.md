@@ -1,61 +1,30 @@
-# Synk
+# Synk — Vibe-Code Rescue Audit
 
-![Synk internal system design](public/synk-system-design.svg)
+Synk audits public sites made with Lovable, Bolt, v0, Cursor, or a similar builder before launch. Enter a URL and Synk uses server-side `fetch` to inspect deployment, SEO, measurable performance signals, security headers, hygiene, and Supabase exposure.
 
-Synk scans a GitHub repository, reads dependency and stack evidence, checks public threat, release, and deprecation signals, then turns the result into action-ready fixes a developer can paste into an IDE.
+## What it checks
 
-## What It Does
+1. **Deployment** — HTTPS, final redirects, preview domains, and reachable routes.
+2. **SEO** — titles, descriptions, social metadata, canonical URLs, robots, sitemaps, headings, and image alt text.
+3. **Performance** — sampled JavaScript weight, render-blocking assets, document size, compression, and caching headers. It does not claim to measure Lighthouse or LCP.
+4. **Supabase security** — read-only OpenAPI and `limit=1` table probes using the public anon key, plus public storage and exposed service-role token detection. Returned rows are stored only as redacted column names, types, and masked values.
+5. **Launch hygiene** — CSP, HSTS, framing and MIME-sniffing headers, source maps, mixed content, exposed files, and analytics.
 
-- Scans GitHub repository manifests and stack files.
-- Uses Bright Data SERP and Web Unlocker for public CVE, exploit, advisory, release, and deprecation evidence.
-- Uses AI/ML API through the Vercel AI SDK to normalize findings into strict risk records.
-- Stores scan memory through Cognee, so the Advisor can reason over previous high-risk findings.
-- Generates fix prompts and downloadable team reports from saved runs.
+Every finding is deterministic. The report includes a score, plain-English explanation, evidence, effort estimate, and a builder-aware Fix Prompt with `full` and safe-only variants.
 
-## Local Run
+## Local development
 
-```bash
+```sh
 npm install
-npm run build
-npm run start -- --port 3100
+npm run dev
 ```
 
-Optional Cognee memory service:
+The URL field works with no environment variables. Speechmatics voice input is optional and degrades with a clear configuration error when `SPEECHMATICS_API_KEY` is absent.
 
-```bash
-npm run cognee:up
-```
+The only secret is `SPEECHMATICS_API_KEY`. `SPEECHMATICS_BATCH_BASE_URL` and `SPEECHMATICS_REALTIME_URL` have defaults.
 
-Required local environment names:
+## Storage and safety
 
-```dotenv
-SERP_API_KEY=
-WEBUNLOCKER_API_KEY=
-AIMLAPI_API_KEY=
-SPEECHMATICS_API_KEY=
-COGNEE_SERVICE_URL=http://localhost:8000
-COGNEE_DATASET_NAME=synk-memory
-```
+Audit records use a typed in-process `Map` in v1. They are not durable across restarts. Identical URLs are deduplicated for 15 minutes.
 
-## Deploy On Render
-
-This repo includes `render.yaml` for a Render Blueprint:
-
-- `synk-web`: the public Next.js app.
-
-Cognee memory is optional on Render. The app still scans, saves browser run history, opens Advisor, and generates fix reports without Cognee. To use external Cognee memory later, set `COGNEE_SERVICE_URL` to a reachable Cognee REST service.
-
-In Render, fill these secrets when the Blueprint asks:
-
-```dotenv
-SERP_API_KEY=
-WEBUNLOCKER_API_KEY=
-AIMLAPI_API_KEY=
-SPEECHMATICS_API_KEY=
-```
-
-Blueprint link after pushing this repo:
-
-```text
-https://dashboard.render.com/blueprint/new?repo=https://github.com/fozagtx/Synk
-```
+Supabase checks are read-only in v1: Synk never writes, inserts, updates, or deletes data. Table probes are capped at 25 and always use `limit=1`. A failed probe becomes an “couldn't check” informational finding, never a passing result.

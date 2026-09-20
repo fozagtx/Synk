@@ -8,7 +8,7 @@ import {
   VoiceProviderConfigurationError,
   VoiceTranscriptionTimeoutError,
   isRecord,
-} from "@/lib/scan/errors";
+} from "@/lib/audit/errors";
 
 export interface SpeechmaticsConfig {
   apiKey: string;
@@ -412,7 +412,7 @@ function parseJsonRecord({
 }): RemoteJsonShapeError | Record<string, unknown> {
   const parsed = errore.try({
     try: () => {
-      return JSON.parse(bodyText) as unknown;
+      return JSON.parse(bodyText);
     },
     catch: (cause) => {
       return new RemoteJsonShapeError({
