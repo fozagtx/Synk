@@ -6,8 +6,8 @@ import {
   FirecrawlResponseShapeError,
   isRecord,
 } from "@/lib/audit/errors";
+import { config } from "@/lib/config";
 
-const FIRECRAWL_URL = "https://api.firecrawl.dev/v1/scrape";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export interface FirecrawlPage {
@@ -66,7 +66,7 @@ async function request({
   }, REQUEST_TIMEOUT_MS);
   const response = await errore.tryAsync({
     try: () =>
-      fetch(FIRECRAWL_URL, {
+      fetch(config.firecrawlUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,

@@ -23,10 +23,12 @@ The URL field works with no environment variables. Speechmatics voice input is o
 
 Optional integrations:
 
+- `SPEECHMATICS_API_KEY` enables optional Speechmatics voice input.
 - `FIRECRAWL_API_KEY` enables rendered-page crawling for JavaScript-heavy sites. Raw fetching remains active for headers, bundles, robots, and sitemap checks.
 - `NEBIUS_API_KEY` enables plain-English report prose written through Nebius. Scores, severities, evidence, SQL, and prompt structure remain deterministic.
-- `NEBIUS_BASE_URL` selects the OpenAI-compatible Nebius endpoint. It defaults to `https://api.studio.nebius.com/v1/`.
-- `NEBIUS_MODEL` selects the Nebius model. It defaults to `Qwen/Qwen3-30B-A3B-Instruct-2507`.
+
+Provider URLs and the Nebius model are non-secret code configuration in
+`lib/config.ts`.
 
 With no Firecrawl or Nebius keys, local audits use the raw-fetch crawler and deterministic report prose. Invalid optional keys fall back to those deterministic paths after logging provider errors.
 

@@ -65,10 +65,10 @@ import * as errore from "errore";
 - Do not read secrets with `process.env` directly in TypeScript.
 - Use the typed `env` object exported by `lib/env.ts` for configuration and secrets.
 - The supported environment variables are `SPEECHMATICS_API_KEY`,
-  `SPEECHMATICS_BATCH_BASE_URL`, `SPEECHMATICS_REALTIME_URL`,
-  `FIRECRAWL_API_KEY`, `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, and
-  `NEBIUS_MODEL`.
-- Render configuration lives in `render.yaml`; keep its defaults and
+  `FIRECRAWL_API_KEY`, and `NEBIUS_API_KEY`.
+- Non-secret provider URLs and the Nebius model are defined in
+  `lib/config.ts`.
+- Render configuration lives in `render.yaml`; keep its
   `sync: false` secret settings aligned with `lib/env.ts`.
 
 ## Long Strings

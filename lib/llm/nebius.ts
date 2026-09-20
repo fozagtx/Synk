@@ -9,6 +9,7 @@ import type {
   ReportProse,
   Scores,
 } from "@/lib/audit/types";
+import { config } from "@/lib/config";
 import { env } from "@/lib/env";
 
 const reportProseSchema = z.object({
@@ -76,7 +77,7 @@ function promptFor({
   resolvedUrl: string;
 }): string {
   return JSON.stringify({
-    instruction: `You are writing for a non-technical founder who built this with ${builder}. Rewrite each finding's summary/whyItMatters/whatToDo in plain English, keep every fact, never invent findings, never change severity, keep ids.`,
+    instruction: `You are writing for a non-technical founder who built this with ${builder}. Rewrite each finding's summary/whyItMatters/whatToDo in plain English, keep every fact, never invent findings, never change severity, keep ids. headline: a calm 3-8 word verdict about launch readiness (no marketing tone, no punctuation tricks). verdict: one sentence that states how many high/blocker items stand between this site and launch.`,
     resolvedUrl,
     scores,
     findings: findings.map((finding) => ({
@@ -107,14 +108,14 @@ export async function writeReportProse({
 
   const provider = createOpenAICompatible({
     name: "nebius",
-    baseURL: env.nebiusBaseUrl,
+    baseURL: config.nebiusBaseUrl,
     apiKey: env.nebiusApiKey,
     supportsStructuredOutputs: true,
   });
   const generated = await errore.tryAsync({
     try: () =>
       generateText({
-        model: provider(env.nebiusModel),
+        model: provider(config.nebiusModel),
         output: Output.object({ schema: reportProseSchema }),
         prompt: promptFor({ findings, scores, builder, resolvedUrl }),
         temperature: 0.2,
@@ -130,7 +131,7 @@ export async function writeReportProse({
     console.warn(
       JSON.stringify({
         event: "nebius_error",
-        model: env.nebiusModel,
+        model: config.nebiusModel,
         message: generated.message,
         cause: details.cause,
         responseBody: details.responseBody,

@@ -1,5 +1,6 @@
 import * as errore from "errore";
 
+import { config } from "@/lib/config";
 import { env } from "@/lib/env";
 import {
   RemoteFetchError,
@@ -50,8 +51,8 @@ export function getSpeechmaticsConfig():
 
   return {
     apiKey: env.speechmaticsApiKey,
-    batchBaseUrl: env.speechmaticsBatchBaseUrl,
-    realtimeUrl: env.speechmaticsRealtimeUrl,
+    batchBaseUrl: config.speechmaticsBatchBaseUrl,
+    realtimeUrl: config.speechmaticsRealtimeUrl,
   };
 }
 
