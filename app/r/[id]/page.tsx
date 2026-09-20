@@ -519,7 +519,7 @@ export default function ReportPage() {
               {report.scores[key] === null ? (
                 <>
                   <p className="mt-2 font-display text-3xl font-bold text-ink">
-                    —
+                    n/a
                   </p>
                   <p className="text-xs text-caption-muted">not checked</p>
                 </>
