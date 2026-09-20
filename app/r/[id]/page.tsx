@@ -142,6 +142,10 @@ function readEffort({
   return "15 min";
 }
 
+function isCategoryScore(value: unknown): value is number | null {
+  return typeof value === "number" || value === null;
+}
+
 function readScores({ value }: { value: unknown }): Scores | null {
   const scoreKeys: Array<keyof Scores> = [
     "deploy",
@@ -159,7 +163,7 @@ function readScores({ value }: { value: unknown }): Scores | null {
     return null;
   }
   const validScores = scoreKeys.every((key) => {
-    return value[key] === null || typeof value[key] === "number";
+    return isCategoryScore(value[key]);
   });
 
   if (!validScores) {
