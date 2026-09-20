@@ -25,6 +25,21 @@ export class RemoteJsonShapeError extends errore.createTaggedError({
   message: "$operation returned an unsupported response shape for $url",
 }) {}
 
+export class FirecrawlRequestError extends errore.createTaggedError({
+  name: "FirecrawlRequestError",
+  message: "Firecrawl request failed for $url: $reason",
+}) {}
+
+export class FirecrawlResponseError extends errore.createTaggedError({
+  name: "FirecrawlResponseError",
+  message: "Firecrawl returned HTTP $status for $url: $body",
+}) {}
+
+export class FirecrawlResponseShapeError extends errore.createTaggedError({
+  name: "FirecrawlResponseShapeError",
+  message: "Firecrawl returned an unsupported response for $url",
+}) {}
+
 export class VoiceProviderConfigurationError extends errore.createTaggedError({
   name: "VoiceProviderConfigurationError",
   message: "Voice transcription provider is not configured: $missing",

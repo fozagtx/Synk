@@ -16,3 +16,11 @@ services:
         value: https://eu1.asr.api.speechmatics.com/v2
       - key: SPEECHMATICS_REALTIME_URL
         value: wss://eu.rt.speechmatics.com/v2
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: NEBIUS_BASE_URL
+        value: https://api.studio.nebius.com/v1/
+      - key: NEBIUS_MODEL
+        value: meta-llama/Llama-3.3-70B-Instruct

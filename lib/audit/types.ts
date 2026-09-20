@@ -37,6 +37,8 @@ export interface SiteContext {
   origin: string;
   status: number;
   html: string;
+  renderedHtml: string | null;
+  crawlSource: "firecrawl" | "fetch";
   headers: Record<string, string>;
   pages: SitePage[];
   robots: string | null;
@@ -90,6 +92,19 @@ export interface AuditReport {
   prioritizedFixes: ReportFinding[];
   fixPrompt: string;
   safeFixPrompt: string;
+  proseSource: "nebius" | "deterministic";
+  crawlSource: "firecrawl" | "fetch";
+}
+
+export interface ReportProse {
+  headline: string;
+  verdict: string;
+  findings: Array<{
+    id: string;
+    summary: string;
+    whyItMatters: string;
+    whatToDo: string;
+  }>;
 }
 
 export interface AuditComparison {

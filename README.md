@@ -10,7 +10,7 @@ Synk audits public sites made with Lovable, Bolt, v0, Cursor, or a similar build
 4. **Supabase security** — read-only OpenAPI and `limit=1` table probes using the public anon key, plus public storage and exposed service-role token detection. Returned rows are stored only as redacted column names, types, and masked values.
 5. **Launch hygiene** — CSP, HSTS, framing and MIME-sniffing headers, source maps, mixed content, exposed files, and analytics.
 
-Every finding is deterministic. The report includes a score, plain-English explanation, evidence, effort estimate, and a builder-aware Fix Prompt with `full` and safe-only variants.
+Scores, severities, evidence, and Fix Prompt structure are deterministic. The report includes a score, plain-English explanation, evidence, effort estimate, and a builder-aware Fix Prompt with `full` and safe-only variants. When Nebius is configured, it can rewrite only the report prose.
 
 ## Local development
 
@@ -21,7 +21,14 @@ npm run dev
 
 The URL field works with no environment variables. Speechmatics voice input is optional and degrades with a clear configuration error when `SPEECHMATICS_API_KEY` is absent.
 
-The only secret is `SPEECHMATICS_API_KEY`. `SPEECHMATICS_BATCH_BASE_URL` and `SPEECHMATICS_REALTIME_URL` have defaults.
+Optional integrations:
+
+- `FIRECRAWL_API_KEY` enables rendered-page crawling for JavaScript-heavy sites. Raw fetching remains active for headers, bundles, robots, and sitemap checks.
+- `NEBIUS_API_KEY` enables plain-English report prose written through Nebius. Scores, severities, evidence, SQL, and prompt structure remain deterministic.
+- `NEBIUS_BASE_URL` selects the OpenAI-compatible Nebius endpoint. It defaults to `https://api.studio.nebius.com/v1/`.
+- `NEBIUS_MODEL` selects the Nebius model. It defaults to `meta-llama/Llama-3.3-70B-Instruct`.
+
+With no Firecrawl or Nebius keys, local audits use the raw-fetch crawler and deterministic report prose. Invalid optional keys fall back to those deterministic paths after logging provider errors.
 
 ## Storage and safety
 
