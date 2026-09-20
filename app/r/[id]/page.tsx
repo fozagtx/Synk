@@ -91,8 +91,6 @@ function readFinding({ value }: { value: unknown }): ReportFinding | null {
     typeof value.summary !== "string" ||
     typeof value.whyItMatters !== "string" ||
     typeof value.exactFix !== "string" ||
-    typeof value.whatToDo !== "string" ||
-    typeof value.effort !== "string" ||
     !Array.isArray(value.evidence)
   ) {
     return null;
@@ -119,8 +117,11 @@ function readFinding({ value }: { value: unknown }): ReportFinding | null {
           ? item.columns.filter((column): column is string => typeof column === "string")
           : [],
       })),
-    whatToDo: value.whatToDo,
-    effort: readEffort({ value: value.effort }),
+    whatToDo:
+      typeof value.whatToDo === "string" ? value.whatToDo : value.exactFix,
+    effort: readEffort({
+      value: typeof value.effort === "string" ? value.effort : "15 min",
+    }),
   };
 }
 
@@ -492,9 +493,18 @@ export default function ReportPage() {
               <p className="text-xs uppercase tracking-widest text-caption-muted">
                 {name}
               </p>
-              <p className="mt-2 font-display text-3xl font-bold text-ink">
-                {report.scores[key]}
-              </p>
+              {report.scores[key] === null ? (
+                <>
+                  <p className="mt-2 font-display text-3xl font-bold text-ink">
+                    —
+                  </p>
+                  <p className="text-xs text-caption-muted">not checked</p>
+                </>
+              ) : (
+                <p className="mt-2 font-display text-3xl font-bold text-ink">
+                  {report.scores[key]}
+                </p>
+              )}
             </div>
           ))}
         </div>

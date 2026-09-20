@@ -44,13 +44,7 @@ function sqlFix({ finding }: { finding: Finding }): string {
   ].join("\n");
 }
 
-function findingFix({
-  finding,
-  builder,
-}: {
-  finding: Finding;
-  builder: Builder;
-}): string {
+function findingFix({ finding }: { finding: Finding }): string {
   if (
     finding.category === "security" &&
     finding.evidence.some((evidence) => evidence.table)
@@ -58,16 +52,10 @@ function findingFix({
     return sqlFix({ finding });
   }
 
-  return finding.exactFix + `\n${builderInstructions({ builder })}`;
+  return finding.exactFix;
 }
 
-function formatItem({
-  finding,
-  builder,
-}: {
-  finding: Finding;
-  builder: Builder;
-}): string {
+function formatItem({ finding }: { finding: Finding }): string {
   const evidence = finding.evidence
     .map((item) => {
       const status = item.status ?? "unavailable";
@@ -80,7 +68,7 @@ function formatItem({
     `[${finding.severity.toUpperCase()}] ${finding.title}`,
     `Finding: ${finding.summary}`,
     `Evidence: ${evidence || "No request evidence was available."}`,
-    `Fix: ${findingFix({ finding, builder })}`,
+    `Fix: ${findingFix({ finding })}`,
   ].join("\n");
 }
 
@@ -117,7 +105,10 @@ export function buildFixPrompts({
 }): { full: string; safe: string } {
   const preamble =
     "You are fixing a production web app. Do not redesign anything. Preserve the existing UI, routes, behavior, and data model unless an item below requires a security fix.";
-  const context = `Context: builder=${builder}; framework=web app; Supabase project ref=${projectRef ?? "not detected"}; resolved URL=${resolvedUrl}.`;
+  const context = [
+    `Context: builder=${builder}; framework=web app; Supabase project ref=${projectRef ?? "not detected"}; resolved URL=${resolvedUrl}.`,
+    `Builder instructions: ${builderInstructions({ builder })}`,
+  ].join("\n");
   const ordered = findings
     .filter((finding) => finding.severity !== "info")
     .sort(
@@ -131,7 +122,7 @@ export function buildFixPrompts({
   const format = (selected: Finding[]): string => {
     const items = selected
       .map((finding, index) => {
-        return `${index + 1}. ${formatItem({ finding, builder })}`;
+        return `${index + 1}. ${formatItem({ finding })}`;
       })
       .join("\n\n");
 

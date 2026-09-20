@@ -66,11 +66,11 @@ export interface AuditStep {
 }
 
 export interface Scores {
-  deploy: number;
-  seo: number;
-  perf: number;
-  security: number;
-  hygiene: number;
+  deploy: number | null;
+  seo: number | null;
+  perf: number | null;
+  security: number | null;
+  hygiene: number | null;
   overall: number;
   launchBlocked: boolean;
 }

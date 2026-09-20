@@ -25,4 +25,28 @@ describe("scoreFindings", () => {
       launchBlocked: true,
     });
   });
+
+  test("marks unavailable-only categories as unchecked", () => {
+    const findings: Finding[] = [{
+      id: "chk-04-supabase-unavailable",
+      checkId: "chk-04-supabase",
+      category: "security",
+      severity: "info",
+      title: "Supabase tables could not be checked",
+      summary: "The schema request was unavailable.",
+      whyItMatters: "No conclusion is safe.",
+      exactFix: "Run the audit again.",
+      evidence: [],
+    }];
+
+    expect(scoreFindings({ findings })).toEqual({
+      deploy: 100,
+      seo: 100,
+      perf: 100,
+      security: null,
+      hygiene: 100,
+      overall: 100,
+      launchBlocked: false,
+    });
+  });
 });
