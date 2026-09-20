@@ -2,11 +2,14 @@ export type Severity = "blocker" | "high" | "medium" | "low" | "info";
 export type Category = "deploy" | "seo" | "perf" | "security" | "hygiene";
 export type Builder = "lovable" | "bolt" | "v0" | "cursor" | "unknown";
 export type AuditStatus = "queued" | "running" | "done" | "failed";
+export type StepState = "pending" | "running" | "done" | "unavailable";
 
 export interface Evidence {
   request: string;
   status: number | null;
   redacted?: string;
+  table?: string | null;
+  columns?: string[];
 }
 
 export interface Finding {
@@ -56,6 +59,12 @@ export interface Check {
   run: (ctx: SiteContext) => Promise<Finding[]>;
 }
 
+export interface AuditStep {
+  id: string;
+  label: string;
+  state: StepState;
+}
+
 export interface Scores {
   deploy: number;
   seo: number;
@@ -83,12 +92,18 @@ export interface AuditReport {
   safeFixPrompt: string;
 }
 
+export interface AuditComparison {
+  fixed: Finding[];
+  stillOpen: Finding[];
+  new: Finding[];
+}
+
 export interface Audit {
   id: string;
   url: string;
   email: string | null;
   status: AuditStatus;
-  currentStep: string;
+  steps: AuditStep[];
   createdAt: string;
   updatedAt: string;
   findings: Finding[];

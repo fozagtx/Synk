@@ -40,6 +40,16 @@ export function scriptSources({ html }: { html: string }): string[] {
     .filter((value) => value.length > 0);
 }
 
+export function modulePreloadSources({ html }: { html: string }): string[] {
+  return Array.from(
+    html.matchAll(
+      /<link\b[^>]+rel=["']modulepreload["'][^>]+href=["']([^"']+)["'][^>]*>/gi,
+    ),
+  )
+    .map((match) => match[1] ?? "")
+    .filter((value) => value.length > 0);
+}
+
 export function stylesheetLinks({ html }: { html: string }): string[] {
   return Array.from(html.matchAll(/<link\b[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/gi))
     .map((match) => match[1] ?? "")

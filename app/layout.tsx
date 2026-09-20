@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, Sora } from "next/font/google";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -13,5 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${inter.variable} ${sora.variable}`}><body><TooltipProvider>{children}</TooltipProvider></body></html>;
+  return (
+    <html lang="en" className={`${inter.variable} ${sora.variable}`}>
+      <body>{children}</body>
+    </html>
+  );
 }

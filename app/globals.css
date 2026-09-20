@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @theme inline {
   --font-sans: var(--font-inter);
@@ -11,12 +10,14 @@
   --color-ink-deep: #000000;
   --color-ink-soft: #36395a;
   --color-ink-muted: #484c7a;
+  --color-ink-secondary: #374151;
   --color-canvas: #ffffff;
   --color-surface-1: #f2f2f2;
   --color-surface-deep: #000033;
   --color-hairline: #e5e7eb;
   --color-hairline-cool: #d6d6e7;
   --color-caption-muted: #9698c3;
+  --color-link-active: #2563eb;
 }
 
 * { box-sizing: border-box; }

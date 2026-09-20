@@ -412,7 +412,7 @@ function parseJsonRecord({
 }): RemoteJsonShapeError | Record<string, unknown> {
   const parsed = errore.try({
     try: () => {
-      return JSON.parse(bodyText) as unknown;
+      return JSON.parse(bodyText);
     },
     catch: (cause) => {
       return new RemoteJsonShapeError({
